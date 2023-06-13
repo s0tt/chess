@@ -3,7 +3,16 @@ player_colors = {
     "b": (138, 110, 69)#"#61573e",
 }
 
-highlight_red_offset = 50
+board_color = {
+    "w": 0,
+    "b": 1
+}
+
+def get_opponent_color(player_col):
+    return player_col ^ 1 #XOR
+
+
+highlight_color = (245, 85, 73)
 
 piece_types = {
     1: "Pawn",
