@@ -35,50 +35,120 @@ class Model:
                                  -1, -1, -1, -1, -1, -1, -1, -1,
                                  1, 1, 1, 1, 1, 1, 1, 1,
                                  4, 2, 3, 5, 6, 3, 2, 4])
+        
+        self._attack_map = np.zeros(64)
+
         self.MoveGen = MoveGen()
+
+        # init turn indicator
+        self.player_turn = 0 #0: white, 1_ black
+        self._view.draw_turn_indicator(self.player_turn)
+
         self.mouse_piece, self.orig = None, None
-        self._last_moves = []
-        self._allowed_moves = set()
+        self._last_moves = [(35,35)]
+        self.allowed_moves = set()
+        self.capture_moves = set()
+        self.other_moves = set()
 
-    def draw(self, display):
-        self._view.draw(display, self._pieces, self._colors)
 
-    def set_piece_at_mouse(self, mouse_pos, piece, orig, allowed_moves=None):
+    def draw(self):
+        self._view.draw(self._pieces, self._colors, self._attack_map)
+
+    def set_piece_at_mouse(self, mouse_pos, orig, allowed_moves=None):
         board_idx = self._view.square_from_mouse(mouse_pos)
-        if allowed_moves != None:
-            if board_idx not in allowed_moves:
-                return
-        if piece:
-            if board_idx != orig:
-                # set piece type
-                self._pieces[board_idx] = piece
-                self._pieces[orig] = -1
-
-                # set color
-                self._colors[board_idx] = self._colors[orig]
-                self._colors[orig] = -1
-
-                # save performed move
-                self._last_moves.append((orig, board_idx))
+        if orig != board_idx:
+            if allowed_moves != None:
+                if board_idx not in allowed_moves:
+                    return
+            self.move_piece(orig, board_idx)
 
     def get_piece(self, idx):
         return self._pieces[idx]
 
     def get_piece_from_mouse(self, mouse_pos):
         board_idx = self._view.square_from_mouse(mouse_pos)
-        piece = self._pieces[board_idx]
-        if piece > 0:
-            return (piece, board_idx)
+        return board_idx
+    
+    def play_move(self, orig, dest, random=False):
+        allowed_moves = self.select_piece(orig)
+        if not random:
+            if dest in allowed_moves:
+                self.move_piece(orig, dest)
         else:
-            return (None, None)  # no piece there
+            self.move_piece(orig, allowed_moves[np.random.randint(0, len(allowed_moves))])
+
+    def move_piece(self, orig, dest):
+        piece = self._pieces[orig]
+        if self._colors[orig] != self.player_turn:
+            return
+        if piece != None and dest != None:
+            if dest != orig:
+                # set piece type
+                if piece == 1 and dest in self.capture_moves and self._pieces[dest] < 0: #  en passant
+                    en_passant_piece_idx = self._last_moves[-1][1]
+                    self._pieces[en_passant_piece_idx] = -1
+                    self._colors[en_passant_piece_idx] = -1
+
+                if piece == 4:
+                    self.MoveGen.set_piece_moved(piece, self._colors[orig], orig)
+                if piece == 6:
+                    self.MoveGen.set_piece_moved(piece, self._colors[orig], orig)
+                    if self._pieces[dest] == 4: # castling
+                        if abs(orig - dest) == 4: #long castle
+                            self._pieces[orig-2] = 6
+                            self._pieces[orig-1] = 4
+                            self._colors[orig-2] = self._colors[orig]
+                            self._colors[orig-1] = self._colors[orig]
+                        else: #short castle
+                            self._pieces[orig+2] = 6
+                            self._pieces[orig+1] = 4
+                            self._colors[orig+2] = self._colors[orig]
+                            self._colors[orig+1] = self._colors[orig]
+                        self._colors[orig] = -1
+                        self._colors[dest] = -1
+                        self._pieces[orig] = -1
+                        self._pieces[dest] = -1 
+                else: # normal moves
+                    self._pieces[dest] = piece
+                    self._pieces[orig] = -1
+
+                    # set color
+                    self._colors[dest] = self._colors[orig]
+                    self._colors[orig] = -1
+
+                # save performed move
+                self._last_moves.append((orig, dest))
+                self._view.set_last_move(set([orig, dest]))
+
+                # update player turn black->white , white -> black
+                self.player_turn ^= 1
+                self._view.draw_turn_indicator(self.player_turn)
+        self.calc_attacks()
+
+    def calc_attacks(self):
+        self._attack_map = np.zeros(64)
+        for idx in range(self._view._board_dim**2):
+            if self._pieces[idx] > 0:
+                allowed_moves = self.select_piece(idx)
+                if len(self.capture_moves) > 0:
+                    np.put(self._attack_map, np.fromiter(self.capture_moves, int, len(self.capture_moves)), 1)
+
+    def select_piece(self, orig):
+        piece = self._pieces[orig]
+        self.allowed_moves = set()
+        if piece > 0:
+            self.capture_moves, self.other_moves = self.MoveGen.allowed_moves(orig, piece, self._pieces, self._colors, self._last_moves[-1])
+            self.allowed_moves = self.capture_moves.union(self.other_moves)
+        return self.allowed_moves
+
 
     def handle_mouse_down(self, mouse_pos):
-        self.mouse_piece, self.orig = self.get_piece_from_mouse(mouse_pos)
-        if self.mouse_piece != None and self.orig != None:
-            self.allowed_moves = self.MoveGen.allowed_moves(self.orig, self.mouse_piece, self._pieces, self._colors)
-            self._view.change_highlights(self.allowed_moves)
+        self.orig = self.get_piece_from_mouse(mouse_pos)
+        if self.orig != None:
+            allowed_moves = self.select_piece(self.orig)
+            self._view.change_highlights(allowed_moves)
 
     def handle_mouse_up(self, mouse_pos):
-        if self.mouse_piece != None and self.orig != None:
-            self.set_piece_at_mouse(mouse_pos, self.mouse_piece, self.orig, self.allowed_moves)
+        if self.orig != None:
+            self.set_piece_at_mouse(mouse_pos, self.orig, self.allowed_moves)
             self._view.change_highlights([], activate=False, all=True)

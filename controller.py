@@ -8,7 +8,7 @@ from model import Model
 class Controller:
     def __init__(self) -> None:
         pygame.init()
-        self.display = pygame.display.set_mode((1280, 720))
+        
         self.clock = pygame.time.Clock()
         self.GameBoard = Board(square_dim=64)
         self.GameModel = Model(self.GameBoard)
@@ -34,7 +34,7 @@ class Controller:
                     
                 
             # fill the screen with a color to wipe away anything from last frame
-            self.GameModel.draw(self.display)
+            self.GameModel.draw()
 
             # flip() the display to put your work on screen
             pygame.display.update()

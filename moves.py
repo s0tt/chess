@@ -48,11 +48,29 @@ class MoveGen:
         self.pawn_moves = [[-8, -16], [8, 16]]
         self.pawn_captures = [[-7, -9], [7, 9]]
         self.pawn_captures64 = [[-9, -11], [9, 11]]
+        self.en_passant_piece_idx = None
+        self.pawn_capture_indices = set()
+        self.king_moved = [False, False]
+        self.rook_moved_l_s = [[False, False], [False, False]]
+        self.king_rook_l_s = [[np.array([57,58, 59]), np.array([61, 62])], [np.array([1, 2, 3]), np.array([5, 6])]]
+        self.rook_idx_l_s = [[56, 63], [0, 7]]
         #self.all_allowed_moves = []
 
     #@functools.lru_cache(maxsize=128)
-    def allowed_moves(self, orig, piece, pieces, colors):
-        moves = set()
+
+    def check_en_passant(self, pieces, colors, last_move):
+        orig, dest = last_move
+        if pieces[dest] == 1: # pawn moved last
+            if abs(dest - orig) == abs(self.pawn_moves[0][1]): # 2 move forward
+                player_col = colors[dest]
+                opponent_col = get_opponent_color(player_col)
+                return set([orig, orig+self.pawn_moves[player_col][0]]), opponent_col
+        return None, None
+            
+
+    def allowed_moves(self, orig, piece, pieces, colors, last_move):
+        capture_moves = set()
+        other_moves = set()
         if piece != 1: #no pawn
             for i in range(self.offsets[piece][0]):
                 idx = orig
@@ -64,37 +82,75 @@ class MoveGen:
                     if pieces[idx] >= 0:
                         if colors[orig] != colors[idx]:
                             # enemy field capture
-                            #if piece == piece_str_to_type("King"):
+                            #if piece == piece_str_to_type["King"]:
                                 # TODO check if to captured piece is protected
                                 #pass
-                            moves.add(idx)
+                            capture_moves.add(idx)
                             expanding = False
                         else:
                             expanding = False
                     else:
-                        moves.add(idx)
+                        if piece == piece_str_to_type["King"]:
+                            other_moves.update(self.check_castling(orig, pieces, colors))
+                        other_moves.add(idx)
                         if not self.slide[piece]:
                             expanding = False
         else:
-            #pawn moves for white pawns
-            orig_color = colors[orig]
-            move_1_fwrd = orig+self.pawn_moves[orig_color][0]
-            move_2_fwrd = orig+self.pawn_moves[orig_color][1]
-            move_l_cptr = orig+self.pawn_captures[orig_color][0]
-            move_r_cptr = orig+self.pawn_captures[orig_color][1]
+            pawn_captures, pawn_moves = self.check_pawn_moves(orig, colors, pieces, last_move)
+            other_moves.update(pawn_moves)
+            capture_moves.update(pawn_captures)
+        return capture_moves, other_moves
+    
+    def check_pawn_moves(self, orig, colors, pieces, last_move):
+        orig_color = colors[orig]
+        capture_moves = set()
+        other_moves = set()
+        move_1_fwrd = orig+self.pawn_moves[orig_color][0]
+        move_2_fwrd = orig+self.pawn_moves[orig_color][1]
+        move_l_cptr = orig+self.pawn_captures[orig_color][0]
+        move_r_cptr = orig+self.pawn_captures[orig_color][1]
 
-            
-            if pieces[move_1_fwrd] < 0: # check free space
-                moves.add(move_1_fwrd)
+        
+        if pieces[move_1_fwrd] < 0: # check free space
+            other_moves.add(move_1_fwrd)
             if self.first_rows[orig_color][0] <= orig <= self.first_rows[orig_color][1]: # case 2 moves allowed from 1st row
                 if pieces[move_2_fwrd] < 0:
-                    moves.add(move_2_fwrd)
-            
-            # check captures with board boundaries
-            if self.mailbox[self.mailbox64[orig]+self.pawn_captures64[orig_color][0]] > -1:
-                if colors[move_l_cptr]  == get_opponent_color(orig_color):
-                    moves.add(move_l_cptr)
-            if self.mailbox[self.mailbox64[orig]+self.pawn_captures64[orig_color][0]] > -1:
-                if colors[move_r_cptr] == get_opponent_color(orig_color):
-                    moves.add(move_r_cptr)
-        return moves
+                    other_moves.add(move_2_fwrd)
+        
+        # check captures with board boundaries
+        en_passant_color = None
+        self.pawn_capture_indices = set()
+        for move_idx, move_type in zip([0, 1],[move_l_cptr, move_r_cptr]):
+            if self.mailbox[self.mailbox64[orig]+self.pawn_captures64[orig_color][move_idx]] > -1:
+                if colors[move_type]  == get_opponent_color(orig_color):
+                    capture_moves.add(move_type)
+                else:
+                    if en_passant_color is None:
+                        en_passant_indices, en_passant_color = self.check_en_passant(pieces, colors, last_move)
+                    if en_passant_color == orig_color:
+                        if move_type in en_passant_indices:
+                            capture_moves.add(move_type)
+        return capture_moves, other_moves
+
+    def check_castling(self, orig, pieces, colors):
+        orig_color = colors[orig]
+        castle_indices = set()
+        if not self.king_moved[orig_color]: #king not moved yet
+            for i in range(2):
+                if not self.rook_moved_l_s[orig_color][i]: #check rook not moved yet
+                    nr_pieces_to_rook = len(self.king_rook_l_s[orig_color][i])
+                    if sum(pieces[self.king_rook_l_s[orig_color][i]]) == -nr_pieces_to_rook: #check long castle corridor free
+                        castle_indices.add(self.rook_idx_l_s[orig_color][i])
+        return castle_indices
+    
+    def set_piece_moved(self, piece, color, board_idx): #0 long, 1 short
+        if piece == piece_str_to_type["King"]:
+            self.king_moved[color] = True
+        elif piece == piece_str_to_type["Rook"]:
+            if board_idx == self.rook_idx_l_s[color][0]:
+                self.rook_moved_l_s[color][0] = True
+            elif board_idx == self.rook_idx_l_s[color][1]:
+                self.rook_moved_l_s[color][0] = True
+
+
+    

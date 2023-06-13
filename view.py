@@ -7,6 +7,8 @@ import os
 
 class Board:
     def __init__(self, board_dim=8, screen_dim=(1280, 720), square_dim=8) -> None:
+        self.display = pygame.display.set_mode((1280, 720))
+        self.display.fill("#bdbdb3")
         self._board_dim = board_dim
         self._screen_dim = screen_dim
         self._square_dim = square_dim
@@ -20,6 +22,7 @@ class Board:
                                      0, 0, 0, 0, 0, 0, 0, 0,
                                      0, 0, 0, 0, 0, 0, 0, 0,
                                      0, 0, 0, 0, 0, 0, 0, 0])
+        self._last_move_indices = set()
 
         self._image_paths = {
             0: r"/mat/pieces/white",
@@ -28,10 +31,10 @@ class Board:
 
         self._rects = []
 
-    def draw(self, display, pieces, colors):
-        self.draw_board(display)
-        self.draw_numbers(display)
-        self.draw_pieces(display, pieces, colors)
+    def draw(self, pieces, colors, attacks):
+        self.draw_board(self.display, attacks=attacks)
+        self.draw_numbers(self.display)
+        self.draw_pieces(self.display, pieces, colors)
 
     def piece_to_image(self, piece_num, color):
         if 0 < piece_num < len(piece_types)+1:
@@ -40,6 +43,13 @@ class Board:
                 ), *self._image_paths[color].split("/"), str(piece_num)+".png")
                 img = pygame.image.load(img_path)
                 return img
+    
+    def draw_turn_indicator(self, color):
+        img =  pygame.font.SysFont(None, 24).render(str("Move indicator:"), True, "#000000")
+        rectangle = pygame.Rect(
+                    self._square_dim, self._board_dim+1 , (self._square_dim*2), (self._square_dim//2))
+        pygame.draw.rect(self.display, player_colors[col_int_to_str[color]], rectangle,0)  # fill rectangle
+        self.display.blit(img, (self._square_dim, self._board_dim+1 ))
 
     def draw_pieces(self, display, pieces, colors):
         for pos in range(self._board_dim**2):
@@ -59,12 +69,17 @@ class Board:
                                     self._square_dim, (pos//self._board_dim) *
                                     self._square_dim))
 
-    def draw_board(self, display, draw_highlights=True):
+    def draw_board(self, display, draw_highlights=True, draw_last_move=True, attacks=[]):
         for row in range(self._board_dim):
             for col in range(self._board_dim):
+                board_idx = grid2continous(row, col)
                 color = player_colors["w"] if (
                     row*self._board_dim+col+row % 2) % 2 == 0 else player_colors["b"]
-                if draw_highlights and self._highlights[(row*self._board_dim + col)]:
+                if len(attacks) > 0 and attacks[board_idx] > 0:
+                    color = attack_color
+                if draw_last_move and board_idx in self._last_move_indices:
+                    color = last_move_color
+                if draw_highlights and self._highlights[board_idx]:
                     # increase R of RGB value for highlights
                     color = highlight_color
                 w, h = self._screen_dim
@@ -77,6 +92,9 @@ class Board:
 
     def get_rects(self):
         return self._rects
+    
+    def set_last_move(self, indices : set):
+        self._last_move_indices = indices
 
     def change_highlights(self, indices : set, activate=True, all=False):
         if not all:
@@ -90,7 +108,7 @@ class Board:
     def square_from_mouse(self, mouse_pos, dim1=True):
         row = mouse_pos[1]//self._square_dim
         col = mouse_pos[0]//self._square_dim
-        if self._board_dim <= row < 0 or self._board_dim <= col < 0:
+        if (self._board_dim <= row) or (self._board_dim <= col):
             return None
         if dim1:
             return row*self._board_dim + col

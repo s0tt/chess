@@ -8,11 +8,21 @@ board_color = {
     "b": 1
 }
 
+col_int_to_str = {v: k for k,v in board_color.items()}
+
 def get_opponent_color(player_col):
     return player_col ^ 1 #XOR
 
+def grid2continous(row, col, board_dim=8):
+    return (row*board_dim) + col
+def continous2grid(idx, board_dim=8):
+    row = idx//board_dim
+    col = idx%board_dim
+    return row, col
 
 highlight_color = (245, 85, 73)
+last_move_color = (242, 196, 90)
+attack_color = (242, 210, 170)
 
 piece_types = {
     1: "Pawn",
