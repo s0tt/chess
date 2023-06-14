@@ -44,6 +44,8 @@ class Model:
         # init turn indicator
         self.player_turn = 0 #0: white, 1_ black
         self.checkmated_color = -1 #0: white, 1_ black
+        self.move_nr = 1
+        self.half_moves_50_check = 0
 
         self._view.draw_turn_indicator(self.player_turn)
 
@@ -74,6 +76,63 @@ class Model:
         board_idx = self._view.square_from_mouse(mouse_pos)
         return board_idx
 
+    def get_fen_string(self):
+        fen_codec_reverse = {v: k for k, v in fen_codec.items()}
+        fen_string = ""
+        empty_fields = 0
+        for row in range(self._view._board_dim):
+            for col in range(self._view._board_dim):
+                i = grid2continous(row,col)
+                if self._pieces[i] < 0:
+                    empty_fields += 1
+                    continue
+                else:
+                    if empty_fields > 0:
+                        fen_string += str(empty_fields)
+                        empty_fields = 0
+                    fen_letter = str(fen_codec_reverse[self._pieces[i]])
+                    if self._colors[i] == 0:
+                        fen_letter = fen_letter.upper()
+                    fen_string += fen_letter
+                
+            fen_string += str(empty_fields) if empty_fields > 0 else ""
+            empty_fields = 0
+            fen_string += "/" if row != self._view._board_dim-1 else ""
+        fen_string += " w " if self.player_turn == 0 else " b "
+        castling_string = ""
+        for i in range(2):
+            if not self.MoveGen.king_moved[i]:
+                if self.MoveGen.rook_moved_l_s[1]:
+                    castling_string += "K" if i == 0 else "k"
+                if self.MoveGen.rook_moved_l_s[0]:
+                    castling_string += "Q" if i == 0 else "q"
+        fen_string += castling_string if len(castling_string) > 0 else "-"
+        en_passant_indices, _ = self.MoveGen.check_en_passant(self._pieces,self._colors, self._last_moves[-1])
+        fen_string += " " + self.get_alpha_num_square(en_passant_indices[0]) if (en_passant_indices != None and len(en_passant_indices)) > 0 else " -"
+        fen_string += " " + str(self.half_moves_50_check)
+        fen_string += " " + str(self.move_nr)
+        return fen_string
+
+    def set_fen_string(self, fen_string):
+        str_parts = fen_string.split(" ")
+        game_string = str_parts[0].strip("/")
+        for i in range(self._view._board_dim**2):
+            piece = fen_codec[game_string[i].lower()] if game_string[i] in fen_codec else -1
+            self._pieces[i] = piece
+            self._colors[i] = 0 if game_string[i].isupper() else 1
+
+                
+        self.player_turn = 0 if game_string[1] == "w" else 1
+        # TODO: En passant & castling decoding & storing
+        self.half_moves_50_check = int(str_parts[4])
+        self.move_nr = int(str_parts[5])
+            
+
+    def get_alpha_num_square(self, idx):
+        row, col = continous2grid(idx)
+        alphabetic = "abcdefgh"
+        nums = "87654321"
+        return alphabetic[col]+nums[row]
     
     def play_move(self, orig, dest, random=False):
         allowed_moves = self.select_piece(orig)
@@ -149,7 +208,9 @@ class Model:
                 self._view.set_last_move(set([orig, dest]))
 
                 # update player turn black->white , white -> black
+                self.move_nr += 1 if self.player_turn == 1 else 0
                 self.player_turn ^= 1
+                self.half_moves_50_check = 0 if (piece == 1 or is_capture) else self.half_moves_50_check+1
                 self._view.draw_turn_indicator(self.player_turn)
         self.calc_attacks()
 

@@ -43,3 +43,16 @@ piece_values = {
     5: 9,
     6: 15   
 }
+
+fen_codec = {
+    "p": piece_str_to_type["Pawn"],
+    "n": piece_str_to_type["Knight"],
+    "b": piece_str_to_type["Bishop"],
+    "r": piece_str_to_type["Rook"],
+    "q": piece_str_to_type["Queen"],
+    "k": piece_str_to_type["King"],
+}
+
+fen_string = {
+    "start": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
+}
