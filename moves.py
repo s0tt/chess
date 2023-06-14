@@ -54,7 +54,11 @@ class MoveGen:
         self.rook_moved_l_s = [[False, False], [False, False]]
         self.king_rook_l_s = [[np.array([57,58, 59]), np.array([61, 62])], [np.array([1, 2, 3]), np.array([5, 6])]]
         self.rook_idx_l_s = [[56, 63], [0, 7]]
-        #self.all_allowed_moves = []
+        
+
+        self.protected = [set(), set()] # protected square for both sides [white, black]
+        self.check_indices = []
+        self.pin_indices = []
 
     #@functools.lru_cache(maxsize=128)
 
@@ -64,34 +68,67 @@ class MoveGen:
             if abs(dest - orig) == abs(self.pawn_moves[0][1]): # 2 move forward
                 player_col = colors[dest]
                 opponent_col = get_opponent_color(player_col)
-                return set([orig, orig+self.pawn_moves[player_col][0]]), opponent_col
+                #return set([orig, orig+self.pawn_moves[player_col][0]]), opponent_col
+                return set([orig+self.pawn_moves[player_col][0]]), opponent_col
         return None, None
             
+    def reset_board_states(self):
+        self.protected = [set(), set()]
+        self.check_indices = []
+        self.pin_indices = []
 
     def allowed_moves(self, orig, piece, pieces, colors, last_move):
         capture_moves = set()
         other_moves = set()
+        pins = []
+        checks = []
+        piece_color = colors[orig]
         if piece != 1: #no pawn
             for i in range(self.offsets[piece][0]):
                 idx = orig
+                capture_cnt = 0 if self.slide[piece] else 1
                 expanding = True
+                all_idx = set()
                 while expanding:
+                    all_idx.add(idx)
                     idx = self.mailbox[self.mailbox64[idx] + self.offsets[piece][1][i]]
                     if idx == -1:
                         break
-                    if pieces[idx] >= 0:
-                        if colors[orig] != colors[idx]:
+                    if pieces[idx] >= 0: # capture moves
+                        if piece_color != colors[idx]:
                             # enemy field capture
-                            #if piece == piece_str_to_type["King"]:
-                                # TODO check if to captured piece is protected
-                                #pass
-                            capture_moves.add(idx)
-                            expanding = False
+                            if piece == piece_str_to_type["King"]:
+                                if idx in self.protected[get_opponent_color(piece_color)]:
+                                    expanding = False
+                                    break
+
+                            if capture_cnt > 0:
+                                if pieces[idx] == piece_str_to_type["King"]:
+                                    self.pin_indices.append(all_idx)
+                                    pins.append(all_idx[-1])
+                                #capture_moves.add(idx)
+                                expanding = False
+                            else:
+                                if pieces[idx] == piece_str_to_type["King"]:
+                                    self.check_indices.append(all_idx)
+                                    checks.append(all_idx[0])
+                                    expanding = False                      
+                                capture_moves.add(idx)
+                            capture_cnt += 1
                         else:
-                            expanding = False
-                    else:
+                            # field of same color
+                            if capture_cnt > 0:
+                                expanding = False
+                            else:
+                                self.protected[piece_color].add(idx)
+                            capture_cnt += 1
+                    else: # free space move
                         if piece == piece_str_to_type["King"]:
+                            if idx in self.protected[get_opponent_color(piece_color)]:
+                                    expanding = False
+                                    break
                             other_moves.update(self.check_castling(orig, pieces, colors))
+                        self.protected[piece_color].add(idx)
                         other_moves.add(idx)
                         if not self.slide[piece]:
                             expanding = False
@@ -99,7 +136,7 @@ class MoveGen:
             pawn_captures, pawn_moves = self.check_pawn_moves(orig, colors, pieces, last_move)
             other_moves.update(pawn_moves)
             capture_moves.update(pawn_captures)
-        return capture_moves, other_moves
+        return capture_moves, other_moves, pins, checks
     
     def check_pawn_moves(self, orig, colors, pieces, last_move):
         orig_color = colors[orig]
@@ -143,6 +180,7 @@ class MoveGen:
                         castle_indices.add(self.rook_idx_l_s[orig_color][i])
         return castle_indices
     
+    # keep track if rook/king moved for casteling
     def set_piece_moved(self, piece, color, board_idx): #0 long, 1 short
         if piece == piece_str_to_type["King"]:
             self.king_moved[color] = True
