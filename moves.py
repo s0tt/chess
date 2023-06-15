@@ -58,8 +58,11 @@ class MoveGen:
         
 
         self.protected = [set(), set()] # protected square for both sides [white, black]
-        self.check_indices = []
+        self.check_indices = defaultdict(list)
         self.pin_indices = defaultdict(list)
+        self.allowed_moves_piece = defaultdict(list)
+        self.pins = [set(), set()] #0: white pins which black pieces, 1: vice versa
+        self.checks = set()
 
     #@functools.lru_cache(maxsize=128)
 
@@ -73,17 +76,30 @@ class MoveGen:
                 return set([orig+self.pawn_moves[player_col][0]]), opponent_col
         return None, None
             
-    def reset_board_states(self):
+    def reset_board_states(self, reset_check=False):
         self.protected = [set(), set()]
-        self.check_indices = []
         self.pin_indices = defaultdict(list)
+        self.allowed_moves_piece = defaultdict(list)
+        self.pins = [set(), set()]
+        if reset_check:
+            self.check_indices = defaultdict(list)
+            self.checks = set()
+
+    # def allowed_moves_pinned(self, orig, dest, colors):
+    #     piece_color = colors[orig]
+    #     if orig in self.pins[get_opponent_color(piece_color)]: # check if piece is pinned by enemy
+    #         return self.pin_indices[orig]
+    #     else:
+    #         return []
+
 
     def allowed_moves(self, orig, piece, pieces, colors, last_move):
         capture_moves = set()
         other_moves = set()
-        pins = []
+        pin = []
         checks = []
         piece_color = colors[orig]
+
         if piece != 1: #no pawn
             for i in range(self.offsets[piece][0]):
                 idx = orig
@@ -108,12 +124,12 @@ class MoveGen:
                             if expand_piece_cnt > 0:
                                 if pieces[idx] == piece_str_to_type["King"]:
                                     self.pin_indices[expand_piece_idx] = (all_idx)
-                                    pins.append(expand_piece_idx)
+                                    pin.append(expand_piece_idx)
                                 #capture_moves.add(idx)
                                 expanding = False
                             else:
                                 if pieces[idx] == piece_str_to_type["King"]:
-                                    self.check_indices.append(all_idx)
+                                    self.check_indices[all_idx[0]] = all_idx
                                     checks.append(all_idx[0])
                                     expanding = False
                                 else:
@@ -145,7 +161,33 @@ class MoveGen:
             pawn_captures, pawn_moves = self.check_pawn_moves(orig, colors, pieces, last_move)
             other_moves.update(pawn_moves)
             capture_moves.update(pawn_captures)
-        return capture_moves, other_moves, pins, checks
+
+        if orig in self.pins[get_opponent_color(piece_color)]: # check if piece is pinned by enemy
+            capture_moves = set([self.pin_indices[orig][0]]).intersection(capture_moves) # capture pinning piece
+            other_moves = set(self.pin_indices[orig][1:]).intersection(other_moves)
+
+        if len(self.checks) > 0:
+            # check exists
+            if len(self.checks) == 1:
+                if piece != piece_str_to_type["King"]: 
+                    other_moves = other_moves.intersection(self.check_indices[0]) #move piece other than king in way
+                     #capture attacking piece
+                elif piece == piece_str_to_type["King"]: #move king out to free square
+                    other_moves = other_moves - set(self.check_indices[0])
+                capture_moves = set(self.checks).intersection(capture_moves)
+            else: # > 1 check
+                capture_moves = set()
+                if piece == piece_str_to_type["King"]:
+                    for nr_check in range(len(self.checks)):
+                        other_moves = other_moves - self.check_indices[nr_check] # find if free unchecked square exists
+
+        self.allowed_moves_piece[orig] = capture_moves.union(other_moves)
+        if len(pin) > 0:
+            self.pins[piece_color].add(pin[0])
+        if len(checks) > 0:
+            self.checks.add(checks[0])
+        #self.allowed_moves = self.capture_moves.union(self.other_moves)
+        return capture_moves, other_moves
     
     
 

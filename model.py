@@ -52,11 +52,11 @@ class Model:
         self.mouse_piece, self.orig = None, None
         self._last_moves = [(35,35)]
         self.allowed_moves = set()
-        self.allowed_moves_piece = {}
+
         self.capture_moves = set()
         self.other_moves = set()
-        self.pins = [[], []]
-        self.checks = []
+        # self.pins = [[], []]
+        # self.checks = []
 
 
     def draw(self):
@@ -146,41 +146,19 @@ class Model:
     def move_piece(self, orig, dest) -> int: # 0: success move, 1: move restricted, 2: check_not_avoidable
         piece = self._pieces[orig]
         castling = False
+        reset_check = True
         is_capture = self._pieces[dest] > 0
         if self._colors[orig] != self.player_turn:
             return
         if piece != None and dest != None:
             if dest != orig:
-                if orig in self.pins[get_opponent_color(self.player_turn)]: # check if piece is pinned by enemy
-                    if dest not in self.MoveGen.pin_indices[orig]:
-                        return 1
-
-                if len(self.checks) > 0:
-                    # check exists --> 1. move piece in way or move king if 1 check
-                    if len(self.checks) == 1:
-                        if piece != piece_str_to_type["King"] and dest in self.MoveGen.check_indices[0]: #move piece other than king in way
-                            pass
-                        # elif piece == piece_str_to_type["King"] and dest not in self.MoveGen.protected:
-                        #     pass # move king out of enemy protected squares
-                        elif dest  == self.checks[0]:   # capture attacking piece
-                            pass
-                        elif piece == piece_str_to_type["King"] and dest not in self.MoveGen.check_indices[0]: #move king out
-                            pass
-                        else:
-                            #self.checkmated_color = get_opponent_color(self._colors[self.checks[0]])
-                            return 2
-
-                    else:
-                        if piece != piece_str_to_type["King"] or dest in self.MoveGen.protected:
-                            #self.checkmated_color = get_opponent_color(self._colors[self.checks[0]])
-                            return 2
-  
+                if dest not in self.MoveGen.allowed_moves_piece[orig]:
+                    return
                 # set piece type
                 if piece == 1 and dest in self.capture_moves and self._pieces[dest] < 0: #  en passant
                     en_passant_piece_idx = self._last_moves[-1][1]
                     self._pieces[en_passant_piece_idx] = -1
                     self._colors[en_passant_piece_idx] = -1
-                
                 if piece == 4:
                     self.MoveGen.set_piece_moved(piece, self._colors[orig], orig)
                 if piece == 6:
@@ -213,6 +191,11 @@ class Model:
                     # call sound making
                     self._view.play_sound("capture" if is_capture else "move")
 
+                    if dest in self.MoveGen.pins[self._colors[dest]]:
+                        # recalc attacks after capture check
+                        reset_check = False
+                        self.calc_attacks()
+
                 # save performed move
                 self._last_moves.append((orig, dest))
                 self._view.set_last_move(set([orig, dest]))
@@ -222,19 +205,19 @@ class Model:
                 self.player_turn ^= 1
                 self.half_moves_50_check = 0 if (piece == 1 or is_capture) else self.half_moves_50_check+1
                 self._view.draw_turn_indicator(self.player_turn)
-        self.calc_attacks()
-        if len(self.checks) > 0:
+        self.calc_attacks(reset_check)
+        if len(self.MoveGen.checks) > 0:
             self._view.play_sound("check")
         return 0
 
-    def calc_attacks(self):
+    def calc_attacks(self, reset_check=False):
         self._attack_map = np.zeros(64)
-        self.MoveGen.reset_board_states()
-        self.pins = [[],[]]
-        self.checks = []
+        self.MoveGen.reset_board_states(reset_check)
+        # self.pins = [[],[]]
+        # self.checks = []
         for idx in range(self._view._board_dim**2):
             if self._pieces[idx] > 0:
-                self.allowed_moves_piece[idx] = self.select_piece(idx)
+                self.select_piece(idx)
                 if len(self.capture_moves) > 0:
                     np.put(self._attack_map, np.fromiter(self.capture_moves, int, len(self.capture_moves)), 1)
 
@@ -250,10 +233,10 @@ class Model:
         piece = self._pieces[orig]
         self.allowed_moves = set()
         if piece > 0:
-            self.capture_moves, self.other_moves, self.pins_piece, self.checks_piece = self.MoveGen.allowed_moves(orig, piece, self._pieces, self._colors, self._last_moves[-1])
-            self.pins[self._colors[orig]] += self.pins_piece
-            self.checks += self.checks_piece
-            self.allowed_moves = self.capture_moves.union(self.other_moves)
+            self.capture_moves, self.other_moves  = self.MoveGen.allowed_moves(orig, piece, self._pieces, self._colors, self._last_moves[-1])
+            #self.pins[self._colors[orig]] += self.pins_piece
+            #self.checks += self.checks_piece
+            self.allowed_moves =  self.capture_moves.union(self.other_moves)
         return self.allowed_moves
 
 
