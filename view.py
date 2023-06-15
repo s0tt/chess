@@ -37,6 +37,7 @@ class Board:
             "castle": r"/mat/sounds/castle.mp3",
             "move": r"/mat/sounds/move-self.mp3",
             "promote": r"/mat/sounds/promote.mp3",
+            "checkmate": r"/mat/sounds/checkmate.mp3",
         }
 
         self._rects = []

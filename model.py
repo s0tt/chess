@@ -211,15 +211,27 @@ class Model:
         return 0
 
     def calc_attacks(self, reset_check=False):
+        move_possible = [True, True]
         self._attack_map = np.zeros(64)
         self.MoveGen.reset_board_states(reset_check)
         # self.pins = [[],[]]
         # self.checks = []
         for idx in range(self._view._board_dim**2):
+            piece_color = self._colors[idx]
             if self._pieces[idx] > 0:
-                self.select_piece(idx)
+                legal_moves = self.select_piece(idx)
+                move_possible[piece_color] &= (len(legal_moves) > 0)
                 if len(self.capture_moves) > 0:
                     np.put(self._attack_map, np.fromiter(self.capture_moves, int, len(self.capture_moves)), 1)
+        
+        self.analyse_checkmate(move_possible)
+
+    def analyse_checkmate(self, move_possible):
+        player_got_checked = get_opponent_color(self.player_turn)
+        if len(self.MoveGen.checks) > 0 and not move_possible[player_got_checked]:
+            # no legal moves for player that got checked left --> MATE
+            self.checkmated_color = player_got_checked
+            self._view.play_sound("checkmate")
 
     # def calc_moves(self):
     #     checkmate_result = True
