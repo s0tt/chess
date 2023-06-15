@@ -1,5 +1,6 @@
 import numpy as np
 from misc import *
+from collections import defaultdict
 
 class MoveGen:
     def __init__(self):
@@ -58,7 +59,7 @@ class MoveGen:
 
         self.protected = [set(), set()] # protected square for both sides [white, black]
         self.check_indices = []
-        self.pin_indices = []
+        self.pin_indices = defaultdict(list)
 
     #@functools.lru_cache(maxsize=128)
 
@@ -75,7 +76,7 @@ class MoveGen:
     def reset_board_states(self):
         self.protected = [set(), set()]
         self.check_indices = []
-        self.pin_indices = []
+        self.pin_indices = defaultdict(list)
 
     def allowed_moves(self, orig, piece, pieces, colors, last_move):
         capture_moves = set()
@@ -86,58 +87,68 @@ class MoveGen:
         if piece != 1: #no pawn
             for i in range(self.offsets[piece][0]):
                 idx = orig
-                capture_cnt = 0 if self.slide[piece] else 1
+                expand_piece_cnt = 0
+                expand_piece_idx = 0
                 expanding = True
-                all_idx = set()
+                all_idx = []
+                last_expand_same_col = False
                 while expanding:
-                    all_idx.add(idx)
+                    all_idx.append(idx)
                     idx = self.mailbox[self.mailbox64[idx] + self.offsets[piece][1][i]]
                     if idx == -1:
                         break
                     if pieces[idx] >= 0: # capture moves
-                        if piece_color != colors[idx]:
-                            # enemy field capture
+                        if piece_color != colors[idx]: # enemy field capture
+                            last_expand_same_col = False
                             if piece == piece_str_to_type["King"]:
                                 if idx in self.protected[get_opponent_color(piece_color)]:
                                     expanding = False
                                     break
 
-                            if capture_cnt > 0:
+                            if expand_piece_cnt > 0:
                                 if pieces[idx] == piece_str_to_type["King"]:
-                                    self.pin_indices.append(all_idx)
-                                    pins.append(all_idx[-1])
+                                    self.pin_indices[expand_piece_idx] = (all_idx)
+                                    pins.append(expand_piece_idx)
                                 #capture_moves.add(idx)
                                 expanding = False
                             else:
                                 if pieces[idx] == piece_str_to_type["King"]:
                                     self.check_indices.append(all_idx)
                                     checks.append(all_idx[0])
-                                    expanding = False                      
+                                    expanding = False
+                                else:
+                                    expand_piece_idx = idx                   
                                 capture_moves.add(idx)
-                            capture_cnt += 1
-                        else:
-                            # field of same color
-                            if capture_cnt > 0:
+                        else: # field of same color
+                            last_expand_same_col = True
+                            if expand_piece_cnt > 0:
                                 expanding = False
                             else:
                                 self.protected[piece_color].add(idx)
-                            capture_cnt += 1
+                        expand_piece_cnt += 1
                     else: # free space move
                         if piece == piece_str_to_type["King"]:
                             if idx in self.protected[get_opponent_color(piece_color)]:
                                     expanding = False
                                     break
                             other_moves.update(self.check_castling(orig, pieces, colors))
-                        self.protected[piece_color].add(idx)
-                        other_moves.add(idx)
-                        if not self.slide[piece]:
+                        if expand_piece_cnt < 1 or not self.slide[piece]:
+                            self.protected[piece_color].add(idx)
+                            other_moves.add(idx)
+                        if last_expand_same_col:
                             expanding = False
+                        last_expand_same_col = False
+                    if not self.slide[piece]:
+                        expanding = False
+
         else:
             pawn_captures, pawn_moves = self.check_pawn_moves(orig, colors, pieces, last_move)
             other_moves.update(pawn_moves)
             capture_moves.update(pawn_captures)
         return capture_moves, other_moves, pins, checks
     
+    
+
     def check_pawn_moves(self, orig, colors, pieces, last_move):
         orig_color = colors[orig]
         capture_moves = set()

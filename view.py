@@ -4,9 +4,11 @@ from misc import *
 import numpy as np
 import os
 
+ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
 
 class Board:
     def __init__(self, board_dim=8, screen_dim=(1280, 720), square_dim=8) -> None:
+        self.mixer = pygame.mixer.init()
         self.display = pygame.display.set_mode((1280, 720))
         self.display.fill("#bdbdb3")
         self._board_dim = board_dim
@@ -29,6 +31,14 @@ class Board:
             1: r"/mat/pieces/black"
         }
 
+        self._audio_paths = {
+            "check": r"/mat/sounds/move-check.mp3",
+            "capture": r"/mat/sounds/capture.mp3",
+            "castle": r"/mat/sounds/castle.mp3",
+            "move": r"/mat/sounds/move-self.mp3",
+            "promote": r"/mat/sounds/promote.mp3",
+        }
+
         self._rects = []
 
     def draw(self, pieces, colors, attacks):
@@ -39,10 +49,18 @@ class Board:
     def piece_to_image(self, piece_num, color):
         if 0 < piece_num < len(piece_types)+1:
             if color >= 0:
-                img_path = os.path.join(os.getcwd(
-                ), *self._image_paths[color].split("/"), str(piece_num)+".png")
+                img_path = os.path.join(ROOT_DIR, *self._image_paths[color].split("/"), str(piece_num)+".png")
                 img = pygame.image.load(img_path)
                 return img
+            
+    def play_sound(self, event_type):
+        if event_type in self._audio_paths:
+            sound_path = os.path.join(ROOT_DIR, *self._audio_paths[event_type].split("/"))
+            sound = pygame.mixer.Sound(sound_path)
+            sound.play()
+        else:
+            raise ValueError("Wrong sound type in play_sound")
+
     
     def draw_turn_indicator(self, color):
         img =  pygame.font.SysFont(None, 24).render(str("Move indicator:"), True, "#000000")
