@@ -45,7 +45,8 @@ class MoveGen:
         }
         self.slide = [False, False, False, True, True, True, False] #Empty, Pawn, Knight, Bishop, Rook, Queen, King
 
-        self.first_rows = [[48,55], [8, 15]] #b, w pawn row indices
+        self.first_rows = [[48,55], [8, 15]] #w, b pawn row indices
+        self.last_rows = [[0, 7][56,63]] #w, b pawn row indices
         self.pawn_moves = [[-8, -16], [8, 16]]
         self.pawn_captures = [[-7, -9], [7, 9]]
         self.pawn_captures64 = [[-9, -11], [9, 11]]
@@ -65,7 +66,7 @@ class MoveGen:
         self.checks = set()
 
     def check_en_passant(self, pieces, colors, last_move):
-        orig, dest = last_move
+        orig, dest, _, _, _ = last_move
         if pieces[dest] == 1: # pawn moved last
             if abs(dest - orig) == abs(self.pawn_moves[0][1]): # 2 move forward
                 player_col = colors[dest]
@@ -74,14 +75,14 @@ class MoveGen:
                 return set([orig+self.pawn_moves[player_col][0]]), opponent_col
         return None, None
             
-    def reset_board_states(self, reset_check=False):
-        self.protected = [set(), set()]
+    def reset_board_states(self, reset_states=True):
         self.pin_indices = defaultdict(list)
         self.allowed_moves_piece = defaultdict(list)
         self.pins = [set(), set()]
-        if reset_check:
+        if reset_states:
             self.check_indices = defaultdict(list)
             self.checks = set()
+            self.protected = [set(), set()]
 
     def allowed_moves(self, orig, piece, pieces, colors, last_move):
         capture_moves = set()
@@ -169,7 +170,7 @@ class MoveGen:
                 capture_moves = set()
                 if piece == piece_str_to_type["King"]:
                     for nr_check in self.checks:
-                        other_moves = other_moves - self.check_indices[nr_check] # find if free unchecked square exists
+                        other_moves = other_moves - set(self.check_indices[nr_check]) # find if free unchecked square exists
 
         self.allowed_moves_piece[orig] = capture_moves.union(other_moves)
         if len(pin) > 0:
@@ -179,18 +180,23 @@ class MoveGen:
         #self.allowed_moves = self.capture_moves.union(self.other_moves)
         return capture_moves, other_moves
     
-    
-
     def check_pawn_moves(self, orig, colors, pieces, last_move):
         orig_color = colors[orig]
         capture_moves = set()
         other_moves = set()
+        promotion_move = set()
         move_1_fwrd = orig+self.pawn_moves[orig_color][0]
         move_2_fwrd = orig+self.pawn_moves[orig_color][1]
         move_l_cptr = orig+self.pawn_captures[orig_color][0]
         move_r_cptr = orig+self.pawn_captures[orig_color][1]
 
-        
+        # # check last row pawn moove --> promotion
+        # if self.last_rows[orig_color][0] <= move_1_fwrd <= self.last_rows[orig_color][1] \
+        #     or self.last_rows[orig_color][0] <= move_l_cptr <= self.last_rows[orig_color][1] \
+        #     or self.last_rows[orig_color][0] <= move_r_cptr <= self.last_rows[orig_color][1]:
+        #     self.promote_pawn(orig, colors, pieces)
+
+                
         if pieces[move_1_fwrd] < 0: # check free space
             other_moves.add(move_1_fwrd)
             if self.first_rows[orig_color][0] <= orig <= self.first_rows[orig_color][1]: # case 2 moves allowed from 1st row
@@ -201,16 +207,21 @@ class MoveGen:
         en_passant_color = None
         self.pawn_capture_indices = set()
         for move_idx, move_type in zip([0, 1],[move_l_cptr, move_r_cptr]):
-            if self.mailbox[self.mailbox64[orig]+self.pawn_captures64[orig_color][move_idx]] > -1:
-                if colors[move_type]  == get_opponent_color(orig_color):
-                    capture_moves.add(move_type)
+            new_idx = self.mailbox[self.mailbox64[orig]+self.pawn_captures64[orig_color][move_idx]]
+            if new_idx > -1:
+                if colors[move_type]  == get_opponent_color(orig_color): #field is enemy field
+                    if pieces[new_idx] == piece_str_to_type["King"]:# Pawn checks
+                        self.check_indices[orig] = [orig]
+                        self.checks.add(orig)
+                    else:
+                        capture_moves.add(move_type)
                 else:
                     if en_passant_color is None:
                         en_passant_indices, en_passant_color = self.check_en_passant(pieces, colors, last_move)
                     if en_passant_color == orig_color:
                         if move_type in en_passant_indices:
                             capture_moves.add(move_type)
-        return capture_moves, other_moves
+        return capture_moves, other_moves, promotion_move
 
     def check_castling(self, orig, pieces, colors):
         orig_color = colors[orig]
