@@ -191,10 +191,10 @@ class Model:
                     # call sound making
                     self._view.play_sound("capture" if is_capture else "move")
 
-                    if dest in self.MoveGen.pins[self._colors[dest]]:
-                        # recalc attacks after capture check
-                        reset_check = False
-                        self.calc_attacks()
+                    # if dest in self.MoveGen.pins[self._colors[dest]]:
+                    #     # recalc attacks after capture check
+                    #     reset_check = False
+                    #     self.calc_attacks()
 
                 # save performed move
                 self._last_moves.append((orig, dest))
@@ -205,49 +205,40 @@ class Model:
                 self.player_turn ^= 1
                 self.half_moves_50_check = 0 if (piece == 1 or is_capture) else self.half_moves_50_check+1
                 self._view.draw_turn_indicator(self.player_turn)
-        self.calc_attacks(reset_check)
+        self.calc_attacks()
         if len(self.MoveGen.checks) > 0:
             self._view.play_sound("check")
         return 0
 
-    def calc_attacks(self, reset_check=False):
-        move_possible = [True, True]
-        self._attack_map = np.zeros(64)
-        self.MoveGen.reset_board_states(reset_check)
-        # self.pins = [[],[]]
-        # self.checks = []
-        for idx in range(self._view._board_dim**2):
-            piece_color = self._colors[idx]
-            if self._pieces[idx] > 0:
-                legal_moves = self.select_piece(idx)
-                move_possible[piece_color] &= (len(legal_moves) > 0)
-                if len(self.capture_moves) > 0:
-                    np.put(self._attack_map, np.fromiter(self.capture_moves, int, len(self.capture_moves)), 1)
-        
-        self.analyse_checkmate(move_possible)
+    def calc_attacks(self):
+        for i in [True, False]:
+            move_not_possible = [False, False]
+            self._attack_map = np.zeros(64)
+            self.MoveGen.reset_board_states(i)
+            # self.pins = [[],[]]
+            # self.checks = []
+            for idx in range(self._view._board_dim**2):
+                piece_color = self._colors[idx]
+                if self._pieces[idx] > 0:
+                    legal_moves = self.select_piece(idx)
+                    move_not_possible[piece_color] |= (len(legal_moves) > 0)
+                    if len(self.capture_moves) > 0:
+                        np.put(self._attack_map, np.fromiter(self.capture_moves, int, len(self.capture_moves)), 1)
+            if i == 2:
+                self.analyse_checkmate(move_not_possible)
 
-    def analyse_checkmate(self, move_possible):
+    def analyse_checkmate(self, move_not_possible):
         player_got_checked = get_opponent_color(self.player_turn)
-        if len(self.MoveGen.checks) > 0 and not move_possible[player_got_checked]:
+        if len(self.MoveGen.checks) > 0 and move_not_possible[player_got_checked]:
             # no legal moves for player that got checked left --> MATE
             self.checkmated_color = player_got_checked
             self._view.play_sound("checkmate")
-
-    # def calc_moves(self):
-    #     checkmate_result = True
-    #     for idx in range(self._view._board_dim**2):
-    #         if self._pieces[idx] > 0:
-    #             if idx in self.allowed_moves_piece:
-    #                 if (self.move_piece() == 2)
-
 
     def select_piece(self, orig):
         piece = self._pieces[orig]
         self.allowed_moves = set()
         if piece > 0:
             self.capture_moves, self.other_moves  = self.MoveGen.allowed_moves(orig, piece, self._pieces, self._colors, self._last_moves[-1])
-            #self.pins[self._colors[orig]] += self.pins_piece
-            #self.checks += self.checks_piece
             self.allowed_moves =  self.capture_moves.union(self.other_moves)
         return self.allowed_moves
 

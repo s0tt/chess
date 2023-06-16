@@ -57,14 +57,12 @@ class MoveGen:
         self.rook_idx_l_s = [[56, 63], [0, 7]]
         
 
-        self.protected = [set(), set()] # protected square for both sides [white, black]
+        self.protected = [set(), set()] # protected square for both sides [white protected indices, black]
         self.check_indices = defaultdict(list)
         self.pin_indices = defaultdict(list)
         self.allowed_moves_piece = defaultdict(list)
         self.pins = [set(), set()] #0: white pins which black pieces, 1: vice versa
         self.checks = set()
-
-    #@functools.lru_cache(maxsize=128)
 
     def check_en_passant(self, pieces, colors, last_move):
         orig, dest = last_move
@@ -84,14 +82,6 @@ class MoveGen:
         if reset_check:
             self.check_indices = defaultdict(list)
             self.checks = set()
-
-    # def allowed_moves_pinned(self, orig, dest, colors):
-    #     piece_color = colors[orig]
-    #     if orig in self.pins[get_opponent_color(piece_color)]: # check if piece is pinned by enemy
-    #         return self.pin_indices[orig]
-    #     else:
-    #         return []
-
 
     def allowed_moves(self, orig, piece, pieces, colors, last_move):
         capture_moves = set()
@@ -170,15 +160,15 @@ class MoveGen:
             # check exists
             if len(self.checks) == 1:
                 if piece != piece_str_to_type["King"]: 
-                    other_moves = other_moves.intersection(self.check_indices[0]) #move piece other than king in way
+                    other_moves = other_moves.intersection(self.check_indices[next(iter(self.checks))]) #move piece other than king in way
                      #capture attacking piece
                 elif piece == piece_str_to_type["King"]: #move king out to free square
-                    other_moves = other_moves - set(self.check_indices[0])
+                    other_moves = other_moves - set(self.check_indices[next(iter(self.checks))])
                 capture_moves = set(self.checks).intersection(capture_moves)
             else: # > 1 check
                 capture_moves = set()
                 if piece == piece_str_to_type["King"]:
-                    for nr_check in range(len(self.checks)):
+                    for nr_check in self.checks:
                         other_moves = other_moves - self.check_indices[nr_check] # find if free unchecked square exists
 
         self.allowed_moves_piece[orig] = capture_moves.union(other_moves)
@@ -224,13 +214,15 @@ class MoveGen:
 
     def check_castling(self, orig, pieces, colors):
         orig_color = colors[orig]
+        opponent_color = get_opponent_color(orig_color)
         castle_indices = set()
         if not self.king_moved[orig_color]: #king not moved yet
             for i in range(2):
                 if not self.rook_moved_l_s[orig_color][i]: #check rook not moved yet
                     nr_pieces_to_rook = len(self.king_rook_l_s[orig_color][i])
-                    if sum(pieces[self.king_rook_l_s[orig_color][i]]) == -nr_pieces_to_rook: #check long castle corridor free
-                        castle_indices.add(self.rook_idx_l_s[orig_color][i])
+                    if sum(pieces[self.king_rook_l_s[orig_color][i]]) == -nr_pieces_to_rook: #check no pieces in castle corridor
+                        if all([val not in self.protected[opponent_color] for val in self.king_rook_l_s[orig_color][i]]):
+                            castle_indices.add(self.rook_idx_l_s[orig_color][i])
         return castle_indices
     
     # keep track if rook/king moved for casteling
