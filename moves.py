@@ -52,10 +52,11 @@ class MoveGen:
         self.pawn_captures64 = [[-9, -11], [9, 11]]
         self.en_passant_square_idx = None
         self.pawn_capture_indices = set()
-        self.king_moved = [False, False]
-        self.rook_moved_l_s = [[False, False], [False, False]]
+        self.king_moved = [0, 0] # move nr in which king was moved
+        self.rook_moved_l_s = [[0, 0], [0, 0]]
         self.king_rook_l_s = [[np.array([57,58, 59]), np.array([61, 62])], [np.array([1, 2, 3]), np.array([5, 6])]]
         self.rook_idx_l_s = [[56, 63], [0, 7]]
+        self.king_idx = [60, 4]
         
 
         self.protected = [set(), set()] # protected square for both sides [white protected indices, black]
@@ -76,13 +77,13 @@ class MoveGen:
         return None, None
             
     def reset_board_states(self, reset_states=True):
-        self.pin_indices = defaultdict(list)
         self.allowed_moves_piece = defaultdict(list)
-        self.pins = [set(), set()]
         if reset_states:
-            self.check_indices = defaultdict(list)
+            self.check_indices = defaultdict(defaultdict(list).copy)
             self.checks = set()
             self.protected = [set(), set()]
+            self.pins = [set(), set()]
+            self.pin_indices = defaultdict(list)
 
     def allowed_moves(self, orig, piece, pieces, colors, last_move, player_turn = None):
         capture_moves = set()
@@ -100,9 +101,10 @@ class MoveGen:
                 expand_piece_cnt = 0
                 expand_piece_idx = 0
                 expanding = True
+                check_in_direction = False
                 all_idx = []
                 last_expand_same_col = False
-                while expanding:
+                while expanding or check_in_direction:
                     all_idx.append(idx)
                     idx = self.mailbox[self.mailbox64[idx] + self.offsets[piece][1][i]]
                     if idx == -1:
@@ -120,13 +122,12 @@ class MoveGen:
                                     self.pin_indices[expand_piece_idx] = all_idx
                                     pin.append(expand_piece_idx)
                                 #capture_moves.add(idx)
-                                if len(checks) > 0:
-                                    self.check_indices[all_idx[0]].append(all_idx)
                                 expanding = False
                             else:
                                 if pieces[idx] == piece_str_to_type["King"]:
-                                    self.check_indices[all_idx[0]].append(all_idx.copy())
+                                    self.check_indices[all_idx[0]][0] = all_idx.copy()
                                     checks.append(all_idx[0])
+                                    check_in_direction = True
                                     #expanding = False
                                 else:
                                     expand_piece_idx = idx                   
@@ -150,13 +151,17 @@ class MoveGen:
                         if last_expand_same_col:
                             expanding = False
                         last_expand_same_col = False
+
                     if not self.slide[piece]:
                         expanding = False
+                if check_in_direction:
+                    self.check_indices[all_idx[0]][1] = all_idx
 
         else:
-            pawn_captures, pawn_moves, pawn_promotions = self.check_pawn_moves(orig, colors, pieces, last_move)
+            pawn_captures, pawn_moves, pawn_promotions, ep_indices = self.check_pawn_moves(orig, colors, pieces, last_move)
             other_moves.update(pawn_moves)
             capture_moves.update(pawn_captures)
+            self.protected[piece_color].update(capture_moves)
 
         if orig in self.pins[get_opponent_color(piece_color)]: # check if piece is pinned by enemy
             capture_moves = set([self.pin_indices[orig][0]]).intersection(capture_moves) # capture pinning piece
@@ -164,27 +169,37 @@ class MoveGen:
 
         if len(self.checks) > 0:
             # check exists
-            if len(self.checks) == 1:
-                check_indices_vals = self.check_indices[next(iter(self.checks))]
-                if piece != piece_str_to_type["King"]: 
-                    other_moves = other_moves.intersection(check_indices_vals[0] if type(check_indices_vals[0]) == list else [check_indices_vals[0]]) #move piece other than king in way
-                     #capture attacking piece
-                elif piece == piece_str_to_type["King"]: #move king out to free square
-                    access_idx = 1 if len(check_indices_vals) > 1 else 0
-                    other_moves = other_moves - set(check_indices_vals[access_idx] if type(check_indices_vals[access_idx]) == list else [check_indices_vals[access_idx]])
-                capture_moves = set(self.checks).intersection(capture_moves)
-            else: # > 1 check
+            if piece_color != colors[next(iter(self.checks))]: # only considere attacked king
+                if len(self.checks) == 1:
+                    check_indices_vals = self.check_indices[next(iter(self.checks))]
+                    if piece != piece_str_to_type["King"]: 
+                        other_moves = other_moves.intersection(check_indices_vals[0] if type(check_indices_vals[0]) == list else [check_indices_vals[0]]) #move piece other than king in way
+                        
+                        #capture attacking piece
+                        # If king all captures are allowed as already checked for protection
+                        capture_moves = set(self.checks).intersection(capture_moves)
+                    elif piece == piece_str_to_type["King"]: #move king out to free square
+                        access_idx = 1 if len(check_indices_vals) > 1 else 0
+                        other_moves = other_moves - set(check_indices_vals[access_idx] if type(check_indices_vals[access_idx]) == list else [check_indices_vals[access_idx]])
+                    
+                    
+                    
+                    if piece == 1 and ep_indices != None and len(ep_indices) > 0:
+                        ep_capture_field = next(iter(ep_indices))
+                        ep_piece_idx_offset = -8 if piece_color == 1 else 8
+                        if next(iter(self.checks)) == ep_capture_field+ep_piece_idx_offset:
+                            capture_moves.add(ep_capture_field)
+                        
+                    # TODO: check for en passant
+                else: # > 1 check
+                    capture_moves = set()
+                    if piece == piece_str_to_type["King"]:
+                        for nr_check in self.checks:
+                            access_idx = 1 if len(self.check_indices[nr_check]) > 1 else 0
+                            other_moves = other_moves - set(self.check_indices[nr_check][access_idx] if type(self.check_indices[nr_check][access_idx]) == list else [self.check_indices[nr_check][access_idx]]) # find if free unchecked square exists
+            else:
                 capture_moves = set()
-                if piece == piece_str_to_type["King"]:
-                    for nr_check in self.checks:
-                        access_idx = 1 if len(self.check_indices[nr_check]) > 1 else 0
-                        other_moves = other_moves - set(self.check_indices[nr_check][access_idx] if type(self.check_indices[nr_check][access_idx]) == list else self.check_indices[nr_check][access_idx]) # find if free unchecked square exists
-
-        self.allowed_moves_piece[orig] = capture_moves.union(other_moves)
-        if len(pin) > 0:
-            self.pins[piece_color].add(pin[0])
-        if len(checks) > 0:
-            self.checks.add(checks[0])
+                other_moves = set()    
         #self.allowed_moves = self.capture_moves.union(self.other_moves)
 
         # integrate promotion indices into move sets
@@ -203,8 +218,22 @@ class MoveGen:
             if dest in other_moves:    
                 other_moves.remove(dest)            
 
+        self.allowed_moves_piece[orig] = capture_moves.union(other_moves)
+        if len(pin) > 0:
+            self.pins[piece_color].add(pin[0])
+        if len(checks) > 0:
+            self.checks.add(checks[0])
+
         return capture_moves, other_moves
     
+    def promotion_moves(self, dest, capture=False):
+        add_bitmask = 0b0100 if capture else 0b0000
+        promo_n = move_types["promo_n"] | add_bitmask
+        promo_b = move_types["promo_b"] | add_bitmask
+        promo_r = move_types["promo_r"] | add_bitmask
+        promo_q = move_types["promo_q"] | add_bitmask
+        return [(dest,promo_n), (dest,promo_b), (dest,promo_r), (dest,promo_q)]
+
     def check_pawn_moves(self, orig, colors, pieces, last_move):
         orig_color = colors[orig]
         capture_moves = set()
@@ -214,25 +243,10 @@ class MoveGen:
         move_2_fwrd = orig+self.pawn_moves[orig_color][1]
         move_l_cptr = orig+self.pawn_captures[orig_color][0]
         move_r_cptr = orig+self.pawn_captures[orig_color][1]
-
-        # # check last row pawn moove --> promotion
-        # if self.last_rows[orig_color][0] <= move_1_fwrd <= self.last_rows[orig_color][1] \
-        #     or self.last_rows[orig_color][0] <= move_l_cptr <= self.last_rows[orig_color][1] \
-        #     or self.last_rows[orig_color][0] <= move_r_cptr <= self.last_rows[orig_color][1]:
-        #     self.promote_pawn(orig, colors, pieces)
-
-        def promotion_moves(dest, capture=False):
-            add_bitmask = 0b0100 if capture else 0b0000
-            promo_n = move_types["promo_n"] | add_bitmask
-            promo_b = move_types["promo_b"] | add_bitmask
-            promo_r = move_types["promo_r"] | add_bitmask
-            promo_q = move_types["promo_q"] | add_bitmask
-            return [(dest,promo_n), (dest,promo_b), (dest,promo_r), (dest,promo_q)]
-
                 
         if pieces[move_1_fwrd] < 0: # check free space
             if self.last_rows[orig_color][0] <= move_1_fwrd <= self.last_rows[orig_color][1]:
-                promotion_move.update(promotion_moves(move_1_fwrd))
+                promotion_move.update(self.promotion_moves(move_1_fwrd))
             other_moves.add(move_1_fwrd)
             if self.first_rows[orig_color][0] <= orig <= self.first_rows[orig_color][1]: # case 2 moves allowed from 1st row
                 if pieces[move_2_fwrd] < 0:
@@ -241,10 +255,13 @@ class MoveGen:
         
         # check captures with board boundaries
         en_passant_color = None
+        en_passant_indices = set()
+        pawn_protected = set()
         self.pawn_capture_indices = set()
         for move_idx, move_type in zip([0, 1],[move_l_cptr, move_r_cptr]):
             new_idx = self.mailbox[self.mailbox64[orig]+self.pawn_captures64[orig_color][move_idx]]
             if new_idx > -1:
+                self.protected[orig_color].add(new_idx)
                 if colors[move_type]  == get_opponent_color(orig_color): #field is enemy field
                     if pieces[new_idx] == piece_str_to_type["King"]:# Pawn checks
                         self.check_indices[orig] = [orig]
@@ -252,7 +269,7 @@ class MoveGen:
                     else:
                         # capture promotion
                         if self.last_rows[orig_color][0] <= move_type <= self.last_rows[orig_color][1]:
-                            promotion_move.update(promotion_moves(move_type, capture=True))
+                            promotion_move.update(self.promotion_moves(move_type, capture=True))
                         
                         capture_moves.add(move_type)
                 else:
@@ -261,30 +278,33 @@ class MoveGen:
                     if en_passant_color == orig_color:
                         if move_type in en_passant_indices:
                             capture_moves.add(move_type)
-        return capture_moves, other_moves, promotion_move
+        return capture_moves, other_moves, promotion_move, en_passant_indices
 
     def check_castling(self, orig, pieces, colors):
         orig_color = colors[orig]
         opponent_color = get_opponent_color(orig_color)
         castle_indices = set()
-        if not self.king_moved[orig_color]: #king not moved yet
+        if not self.king_moved[orig_color] and pieces[self.king_idx[orig_color]] == piece_str_to_type["King"]: #king not moved yet
+            if len(self.checks) > 0 and colors[next(iter(self.checks))] == opponent_color:
+                return castle_indices # if check of same color king is present -> no
             for i in range(2):
-                if not self.rook_moved_l_s[orig_color][i]: #check rook not moved yet
-                    nr_pieces_to_rook = len(self.king_rook_l_s[orig_color][i])
-                    if sum(pieces[self.king_rook_l_s[orig_color][i]]) == -nr_pieces_to_rook: #check no pieces in castle corridor
-                        if all([val not in self.protected[opponent_color] for val in self.king_rook_l_s[orig_color][i]]):
-                            castle_indices.add(self.rook_idx_l_s[orig_color][i])
+                if pieces[self.rook_idx_l_s[orig_color][i]] == piece_str_to_type["Rook"]: 
+                    if not self.rook_moved_l_s[orig_color][i]: #check rook not moved yet
+                        nr_pieces_to_rook = len(self.king_rook_l_s[orig_color][i])
+                        if sum(pieces[self.king_rook_l_s[orig_color][i]]) == -nr_pieces_to_rook: #check no pieces in castle corridor
+                            if all([val not in self.protected[opponent_color] for val in self.king_rook_l_s[orig_color][i]]):
+                                castle_indices.add(self.rook_idx_l_s[orig_color][i])
         return castle_indices
     
     # keep track if rook/king moved for casteling
-    def set_piece_moved(self, piece, color, board_idx): #0 long, 1 short
-        if piece == piece_str_to_type["King"]:
-            self.king_moved[color] = True
+    def set_piece_moved(self, piece, color, board_idx, move_nr): #0 long, 1 short
+        if piece == piece_str_to_type["King"] and self.king_moved[color] == 0:
+            self.king_moved[color] = move_nr
         elif piece == piece_str_to_type["Rook"]:
-            if board_idx == self.rook_idx_l_s[color][0]:
-                self.rook_moved_l_s[color][0] = True
-            elif board_idx == self.rook_idx_l_s[color][1]:
-                self.rook_moved_l_s[color][0] = True
+            if board_idx == self.rook_idx_l_s[color][0] and self.rook_moved_l_s[color][0] == 0:
+                self.rook_moved_l_s[color][0] = move_nr
+            elif board_idx == self.rook_idx_l_s[color][1] and self.rook_moved_l_s[color][0] == 0:
+                self.rook_moved_l_s[color][1] = move_nr
 
 
     

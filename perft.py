@@ -3,185 +3,90 @@ from view import Board
 from model import Model
 import pygame
 import time
-
-perft_testcases = [
-   {
-      "depth":1,
-      "nodes":20,
-      "fen":"rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
-   },
-   {
-      "depth":2,
-      "nodes":400,
-      "fen":"rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
-   },
-   # {
-   #    "depth":6,
-   #    "nodes":119060324,
-   #    "fen":"rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
-   # },
-   {
-      "depth":1,
-      "nodes":8,
-      "fen":"r6r/1b2k1bq/8/8/7B/8/8/R3K2R b KQ - 3 2"
-   },
-   {
-      "depth":1,
-      "nodes":8,
-      "fen":"8/8/8/2k5/2pP4/8/B7/4K3 b - d3 0 3"
-   },
-   {
-      "depth":1,
-      "nodes":19,
-      "fen":"r1bqkbnr/pppppppp/n7/8/8/P7/1PPPPPPP/RNBQKBNR w KQkq - 2 2"
-   },
-   {
-      "depth":1,
-      "nodes":5,
-      "fen":"r3k2r/p1pp1pb1/bn2Qnp1/2qPN3/1p2P3/2N5/PPPBBPPP/R3K2R b KQkq - 3 2"
-   },
-   {
-      "depth":1,
-      "nodes":44,
-      "fen":"2kr3r/p1ppqpb1/bn2Qnp1/3PN3/1p2P3/2N5/PPPBBPPP/R3K2R b KQ - 3 2"
-   },
-   {
-      "depth":1,
-      "nodes":39,
-      "fen":"rnb2k1r/pp1Pbppp/2p5/q7/2B5/8/PPPQNnPP/RNB1K2R w KQ - 3 9"
-   },
-   {
-      "depth":1,
-      "nodes":9,
-      "fen":"2r5/3pk3/8/2P5/8/2K5/8/8 w - - 5 4"
-   },
-   {
-      "depth":3,
-      "nodes":62379,
-      "fen":"rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w KQ - 1 8"
-   },
-   {
-      "depth":3,
-      "nodes":89890,
-      "fen":"r4rk1/1pp1qppp/p1np1n2/2b1p1B1/2B1P1b1/P1NP1N2/1PP1QPPP/R4RK1 w - - 0 10"
-   },
-   {
-      "depth":6,
-      "nodes":1134888,
-      "fen":"3k4/3p4/8/K1P4r/8/8/8/8 b - - 0 1"
-   },
-   {
-      "depth":6,
-      "nodes":1015133,
-      "fen":"8/8/4k3/8/2p5/8/B2P2K1/8 w - - 0 1"
-   },
-   {
-      "depth":6,
-      "nodes":1440467,
-      "fen":"8/8/1k6/2b5/2pP4/8/5K2/8 b - d3 0 1"
-   },
-   {
-      "depth":6,
-      "nodes":661072,
-      "fen":"5k2/8/8/8/8/8/8/4K2R w K - 0 1"
-   },
-   {
-      "depth":6,
-      "nodes":803711,
-      "fen":"3k4/8/8/8/8/8/8/R3K3 w Q - 0 1"
-   },
-   {
-      "depth":4,
-      "nodes":1274206,
-      "fen":"r3k2r/1b4bq/8/8/8/8/7B/R3K2R w KQkq - 0 1"
-   },
-   {
-      "depth":4,
-      "nodes":1720476,
-      "fen":"r3k2r/8/3Q4/8/8/5q2/8/R3K2R b KQkq - 0 1"
-   },
-   {
-      "depth":6,
-      "nodes":3821001,
-      "fen":"2K2r2/4P3/8/8/8/8/8/3k4 w - - 0 1"
-   },
-   {
-      "depth":5,
-      "nodes":1004658,
-      "fen":"8/8/1P2K3/8/2n5/1q6/8/5k2 b - - 0 1"
-   },
-   {
-      "depth":6,
-      "nodes":217342,
-      "fen":"4k3/1P6/8/8/8/8/K7/8 w - - 0 1"
-   },
-   {
-      "depth":6,
-      "nodes":92683,
-      "fen":"8/P1k5/K7/8/8/8/8/8 w - - 0 1"
-   },
-   {
-      "depth":6,
-      "nodes":2217,
-      "fen":"K1k5/8/P7/8/8/8/8/8 w - - 0 1"
-   },
-   {
-      "depth":7,
-      "nodes":567584,
-      "fen":"8/k1P5/8/1K6/8/8/8/8 w - - 0 1"
-   },
-   {
-      "depth":4,
-      "nodes":23527,
-      "fen":"8/8/2k5/5q2/5n2/8/5K2/8 b - - 0 1"
-   }
-]
-
-
+from misc import *
+from stockfish import Stockfish
+from testcases import perft_testcases
 class PerftTest:
-    def __init__(self, draw_board=True):
+    def __init__(self, draw_board=False):
         self.nodes = 0
+        self.last_node_cnt = 0
+        self.stockfish = Stockfish(
+            path=r"C:\Users\kicke\Downloads\stockfish_15.1_win_x64_avx2\stockfish_15.1_win_x64_avx2\stockfish-windows-2022-x86-64-avx2.exe")
         # self.Controls = Controller()
         # self.Controls.run()
         self.GameBoard = Board(square_dim=64)
-        self.GameModel = Model(self.GameBoard)
+        self.GameModel = Model(self.GameBoard, sounds=False)
         self.draw_board = draw_board
-        if self.draw_board:
-            pygame.init()
+        self.current_fen = ""
+        pygame.init()
+
+    def test_stockfish(self, depth):
+        self.stockfish.set_fen_position(self.current_fen)
+        self.stockfish.set_depth(depth)
+        self.result_stockfish = self.stockfish._perft(depth)
 
     def test(self):
-        for test_idx, test in enumerate(perft_testcases[2:]):
+        for test_idx, test in enumerate(perft_testcases[15:]):
             print(f"Running Testcase {test_idx}...")
             self.GameModel.set_fen_string(test["fen"])
             self.draw()
+            self.current_fen = test["fen"]
+            self.current_depth = test["depth"]
+            self.last_node_cnt = 0
+            self.res_detailed = {}
+            self.test_stockfish(test["depth"])
             nodes = self.perft(test["depth"])
-            print(f"RESULT TC{test_idx}: {nodes}/{test['nodes']}")
+            missing = {}
+            for k, v in self.result_stockfish.items():
+                if k not in self.res_detailed and k != "total" and "Nodes searched" not in k:
+                    missing[k] = v
+            print(
+                f"RESULT TC{test_idx}: {nodes}/{test['nodes']}/{self.result_stockfish['total']}/ Missing: {missing}")
 
-    def draw(self, delay=1):
+    def draw(self, delay=0.10):
         if self.draw_board:
             time.sleep(delay)
             self.GameModel.draw()
             pygame.display.update()
 
-    def perft(self, depth, play_turn_color_only=True):
+    def perft(self, depth, play_turn_color_only=True, print_intermediate=True):
         nodes = 0
-        #print("\t Perft Depth ", depth)
+        # print("\t Perft Depth ", depth)
         if (depth == 0):
             return 1
 
         legal_moves = self.GameModel.generate_legal_moves()
-        if nodes%10000:
-            print("\t Nodes:", nodes)
+        #self.GameModel.print_board_state()
+        if nodes % 10000:
+            print("\t\t Nodes:", nodes)
         for orig, all_dest in legal_moves.items():
             if self.GameModel.player_turn != self.GameModel._colors[orig]:
                 continue
             for dest in all_dest:
+                len_last_move = len(self.GameModel._last_moves)
                 self.GameModel.move_piece(orig, dest)
+                #assert len_last_move + 1 == len(self.GameModel._last_moves) 
                 self.draw()
                 nodes += self.perft(depth - 1)
                 self.GameModel.unmove_piece()
+                #assert len_last_move == len(self.GameModel._last_moves)
                 self.draw()
+                if print_intermediate and depth == self.current_depth:
+                    if type(dest) == tuple:
+                        dest_idx = dest[0]
+                        dest_promo = str(move_desc[dest[1]])[-1]
+                    else:
+                        dest_idx = dest
+                        dest_promo = ""
+                    o = self.GameModel.board2alphanum(orig)
+                    d = self.GameModel.board2alphanum(dest_idx)
+                    comb_move_str = str(o)+str(d)+dest_promo
+                    self.res_detailed[comb_move_str] = nodes-self.last_node_cnt
+                    print(
+                        f"\t {comb_move_str}: {nodes-self.last_node_cnt} / {self.result_stockfish[comb_move_str]} <- Stockfish")
+                    self.last_node_cnt = nodes
         return nodes
+
 
 MoveGenTests = PerftTest()
 MoveGenTests.test()

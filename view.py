@@ -8,8 +8,9 @@ ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
 
 class Board:
     def __init__(self, board_dim=8, screen_dim=(1280, 720), square_dim=8) -> None:
+        os.environ['SDL_VIDEO_WINDOW_POS'] = "%d,%d" % (1200,500)
         self.mixer = pygame.mixer.init()
-        self.display = pygame.display.set_mode((1280, 720))
+        self.display = pygame.display.set_mode((720, 720))
         self.display.fill("#bdbdb3")
         self._board_dim = board_dim
         self._screen_dim = screen_dim
