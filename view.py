@@ -119,7 +119,8 @@ class Board:
         if not all:
             if indices == None:
                 return
-            self._highlights[list(indices)] = 1 if activate else 0
+            indices = [i[0] if type(i) == tuple else i for i in indices]
+            self._highlights[indices] = 1 if activate else 0
         else:
             for i in range(self._board_dim**2):
                 self._highlights[i] = 1 if activate else 0

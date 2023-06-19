@@ -56,3 +56,32 @@ fen_codec = {
 fen_string = {
     "start": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
 }
+
+move_desc = {
+    0:  "quiet",
+    1: 	"pawn_double",
+    2: 	"castle_king",
+    3: 	"castle_queen",
+    4: 	"capture",
+    5: 	"ep_capture",
+    8: 	"promo_n",
+    9: 	"promo_b",
+    10: "promo_r",
+    11: "promo_q",
+    12: "promo_capture_n",
+    13: "promo_capture_b",
+    14: "promo_capture_r",
+    15: "promo_capture_q", 
+}
+move_types = {v: k for k, v in move_desc.items()}
+
+move_promo_to_piece = {
+    8: 	piece_str_to_type["Knight"],
+    9: 	piece_str_to_type["Bishop"],
+    10: piece_str_to_type["Rook"],
+    11: piece_str_to_type["Queen"],
+    12: piece_str_to_type["Knight"],
+    13: piece_str_to_type["Bishop"],
+    14: piece_str_to_type["Rook"],
+    15: piece_str_to_type["Queen"],
+}

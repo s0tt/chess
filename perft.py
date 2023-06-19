@@ -2,6 +2,7 @@
 from view import Board
 from model import Model
 import pygame
+import time
 
 perft_testcases = [
    {
@@ -14,11 +15,11 @@ perft_testcases = [
       "nodes":400,
       "fen":"rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
    },
-   {
-      "depth":6,
-      "nodes":119060324,
-      "fen":"rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
-   },
+   # {
+   #    "depth":6,
+   #    "nodes":119060324,
+   #    "fen":"rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
+   # },
    {
       "depth":1,
       "nodes":8,
@@ -138,7 +139,7 @@ perft_testcases = [
 
 
 class PerftTest:
-    def __init__(self, draw_board=False):
+    def __init__(self, draw_board=True):
         self.nodes = 0
         # self.Controls = Controller()
         # self.Controls.run()
@@ -149,26 +150,31 @@ class PerftTest:
             pygame.init()
 
     def test(self):
-        for test_idx, test in enumerate(perft_testcases):
+        for test_idx, test in enumerate(perft_testcases[2:]):
             print(f"Running Testcase {test_idx}...")
             self.GameModel.set_fen_string(test["fen"])
             self.draw()
             nodes = self.perft(test["depth"])
             print(f"RESULT TC{test_idx}: {nodes}/{test['nodes']}")
 
-    def draw(self):
+    def draw(self, delay=1):
         if self.draw_board:
+            time.sleep(delay)
             self.GameModel.draw()
             pygame.display.update()
 
-    def perft(self, depth):
+    def perft(self, depth, play_turn_color_only=True):
         nodes = 0
         #print("\t Perft Depth ", depth)
         if (depth == 0):
             return 1
 
         legal_moves = self.GameModel.generate_legal_moves()
+        if nodes%10000:
+            print("\t Nodes:", nodes)
         for orig, all_dest in legal_moves.items():
+            if self.GameModel.player_turn != self.GameModel._colors[orig]:
+                continue
             for dest in all_dest:
                 self.GameModel.move_piece(orig, dest)
                 self.draw()

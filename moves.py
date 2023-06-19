@@ -46,11 +46,11 @@ class MoveGen:
         self.slide = [False, False, False, True, True, True, False] #Empty, Pawn, Knight, Bishop, Rook, Queen, King
 
         self.first_rows = [[48,55], [8, 15]] #w, b pawn row indices
-        self.last_rows = [[0, 7][56,63]] #w, b pawn row indices
+        self.last_rows = [[0, 7], [56,63]] #w, b pawn row indices
         self.pawn_moves = [[-8, -16], [8, 16]]
         self.pawn_captures = [[-7, -9], [7, 9]]
         self.pawn_captures64 = [[-9, -11], [9, 11]]
-        self.en_passant_piece_idx = None
+        self.en_passant_square_idx = None
         self.pawn_capture_indices = set()
         self.king_moved = [False, False]
         self.rook_moved_l_s = [[False, False], [False, False]]
@@ -59,7 +59,7 @@ class MoveGen:
         
 
         self.protected = [set(), set()] # protected square for both sides [white protected indices, black]
-        self.check_indices = defaultdict(list)
+        self.check_indices = defaultdict(defaultdict(list).copy)#defaultdict(list)
         self.pin_indices = defaultdict(list)
         self.allowed_moves_piece = defaultdict(list)
         self.pins = [set(), set()] #0: white pins which black pieces, 1: vice versa
@@ -84,12 +84,15 @@ class MoveGen:
             self.checks = set()
             self.protected = [set(), set()]
 
-    def allowed_moves(self, orig, piece, pieces, colors, last_move):
+    def allowed_moves(self, orig, piece, pieces, colors, last_move, player_turn = None):
         capture_moves = set()
         other_moves = set()
+        pawn_promotions = set()
         pin = []
         checks = []
         piece_color = colors[orig]
+        if player_turn != None and player_turn != piece_color:
+            return
 
         if piece != 1: #no pawn
             for i in range(self.offsets[piece][0]):
@@ -114,15 +117,17 @@ class MoveGen:
 
                             if expand_piece_cnt > 0:
                                 if pieces[idx] == piece_str_to_type["King"]:
-                                    self.pin_indices[expand_piece_idx] = (all_idx)
+                                    self.pin_indices[expand_piece_idx] = all_idx
                                     pin.append(expand_piece_idx)
                                 #capture_moves.add(idx)
+                                if len(checks) > 0:
+                                    self.check_indices[all_idx[0]].append(all_idx)
                                 expanding = False
                             else:
                                 if pieces[idx] == piece_str_to_type["King"]:
-                                    self.check_indices[all_idx[0]] = all_idx
+                                    self.check_indices[all_idx[0]].append(all_idx.copy())
                                     checks.append(all_idx[0])
-                                    expanding = False
+                                    #expanding = False
                                 else:
                                     expand_piece_idx = idx                   
                                 capture_moves.add(idx)
@@ -149,7 +154,7 @@ class MoveGen:
                         expanding = False
 
         else:
-            pawn_captures, pawn_moves = self.check_pawn_moves(orig, colors, pieces, last_move)
+            pawn_captures, pawn_moves, pawn_promotions = self.check_pawn_moves(orig, colors, pieces, last_move)
             other_moves.update(pawn_moves)
             capture_moves.update(pawn_captures)
 
@@ -160,17 +165,20 @@ class MoveGen:
         if len(self.checks) > 0:
             # check exists
             if len(self.checks) == 1:
+                check_indices_vals = self.check_indices[next(iter(self.checks))]
                 if piece != piece_str_to_type["King"]: 
-                    other_moves = other_moves.intersection(self.check_indices[next(iter(self.checks))]) #move piece other than king in way
+                    other_moves = other_moves.intersection(check_indices_vals[0] if type(check_indices_vals[0]) == list else [check_indices_vals[0]]) #move piece other than king in way
                      #capture attacking piece
                 elif piece == piece_str_to_type["King"]: #move king out to free square
-                    other_moves = other_moves - set(self.check_indices[next(iter(self.checks))])
+                    access_idx = 1 if len(check_indices_vals) > 1 else 0
+                    other_moves = other_moves - set(check_indices_vals[access_idx] if type(check_indices_vals[access_idx]) == list else [check_indices_vals[access_idx]])
                 capture_moves = set(self.checks).intersection(capture_moves)
             else: # > 1 check
                 capture_moves = set()
                 if piece == piece_str_to_type["King"]:
                     for nr_check in self.checks:
-                        other_moves = other_moves - set(self.check_indices[nr_check]) # find if free unchecked square exists
+                        access_idx = 1 if len(self.check_indices[nr_check]) > 1 else 0
+                        other_moves = other_moves - set(self.check_indices[nr_check][access_idx] if type(self.check_indices[nr_check][access_idx]) == list else self.check_indices[nr_check][access_idx]) # find if free unchecked square exists
 
         self.allowed_moves_piece[orig] = capture_moves.union(other_moves)
         if len(pin) > 0:
@@ -178,6 +186,23 @@ class MoveGen:
         if len(checks) > 0:
             self.checks.add(checks[0])
         #self.allowed_moves = self.capture_moves.union(self.other_moves)
+
+        # integrate promotion indices into move sets
+        if len(pawn_promotions) > 0:
+            for promotion_move in pawn_promotions:
+                dest, move_type = promotion_move
+                is_capture = move_type & 0b0100 
+                if is_capture:
+                    if dest in capture_moves:
+                        capture_moves.add(promotion_move)
+                else:
+                    if dest in other_moves:
+                        other_moves.add(promotion_move)
+            if dest in capture_moves:    
+                capture_moves.remove(dest)      
+            if dest in other_moves:    
+                other_moves.remove(dest)            
+
         return capture_moves, other_moves
     
     def check_pawn_moves(self, orig, colors, pieces, last_move):
@@ -196,12 +221,23 @@ class MoveGen:
         #     or self.last_rows[orig_color][0] <= move_r_cptr <= self.last_rows[orig_color][1]:
         #     self.promote_pawn(orig, colors, pieces)
 
+        def promotion_moves(dest, capture=False):
+            add_bitmask = 0b0100 if capture else 0b0000
+            promo_n = move_types["promo_n"] | add_bitmask
+            promo_b = move_types["promo_b"] | add_bitmask
+            promo_r = move_types["promo_r"] | add_bitmask
+            promo_q = move_types["promo_q"] | add_bitmask
+            return [(dest,promo_n), (dest,promo_b), (dest,promo_r), (dest,promo_q)]
+
                 
         if pieces[move_1_fwrd] < 0: # check free space
+            if self.last_rows[orig_color][0] <= move_1_fwrd <= self.last_rows[orig_color][1]:
+                promotion_move.update(promotion_moves(move_1_fwrd))
             other_moves.add(move_1_fwrd)
             if self.first_rows[orig_color][0] <= orig <= self.first_rows[orig_color][1]: # case 2 moves allowed from 1st row
                 if pieces[move_2_fwrd] < 0:
                     other_moves.add(move_2_fwrd)
+            
         
         # check captures with board boundaries
         en_passant_color = None
@@ -214,6 +250,10 @@ class MoveGen:
                         self.check_indices[orig] = [orig]
                         self.checks.add(orig)
                     else:
+                        # capture promotion
+                        if self.last_rows[orig_color][0] <= move_type <= self.last_rows[orig_color][1]:
+                            promotion_move.update(promotion_moves(move_type, capture=True))
+                        
                         capture_moves.add(move_type)
                 else:
                     if en_passant_color is None:
