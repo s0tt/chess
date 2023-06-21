@@ -230,27 +230,31 @@ class Model:
                 if piece == 6:
                     self.MoveGen.set_piece_moved(
                         piece, self._colors[orig], orig, self.move_nr)
-                    if self._pieces[dest] == 4:  # castling
+                    if 1 < abs(orig-dest) < 6: #if self._pieces[dest] == 4:  # castling
                         is_capture = False
                         is_castling = True
 
                         self.play_sound("castle")
-                        if abs(orig - dest) == 4:  # long castle
+                        if abs(orig - dest) == 3:  # long castle
                             move_type = move_types["castle_queen"]
                             self._pieces[orig-2] = 6
                             self._pieces[orig-1] = 4
                             self._colors[orig-2] = self._colors[orig]
                             self._colors[orig-1] = self._colors[orig]
-                        else:  # short castle
+                            self._colors[orig-4] = -1
+                            self._pieces[orig-4] = -1
+                        elif abs(orig - dest) == 2:  # short castle
                             move_type = move_types["castle_king"]
                             self._pieces[orig+2] = 6
                             self._pieces[orig+1] = 4
                             self._colors[orig+2] = self._colors[orig]
                             self._colors[orig+1] = self._colors[orig]
+                            self._colors[orig+3] = -1
+                            self._pieces[orig+3] = -1
+                        old_col = self._colors[orig]
                         self._colors[orig] = -1
-                        self._colors[dest] = -1
                         self._pieces[orig] = -1
-                        self._pieces[dest] = -1
+
 
                 if piece == 1:
                     # #pawn promotion
@@ -351,20 +355,23 @@ class Model:
             self._colors[dest] = -1
             self._pieces[dest] = -1
         elif move_type == 2 or move_type == 3: #castling
-            if abs(orig - dest) == 4: #long castle
+            if abs(orig - dest) == 3: #long castle
                 self._pieces[orig-2] = -1
                 self._pieces[orig-1] = -1
                 self._colors[orig-2] = -1
                 self._colors[orig-1] = -1
-            elif abs(orig - dest) ==  3: #short castle
+                self._colors[orig-4] = old_col
+                self._pieces[orig-4] = 4 
+            elif abs(orig - dest) ==  2: #short castle
                 self._pieces[orig+2] = -1
                 self._pieces[orig+1] = -1
                 self._colors[orig+2] = -1
-                self._colors[orig+1] = -1      
+                self._colors[orig+1] = -1
+                self._colors[orig+3] = old_col
+                self._pieces[orig+3] = 4        
             self._colors[orig] = old_col
             self._pieces[orig] = 6
-            self._colors[dest] = old_col
-            self._pieces[dest] = 4              
+          
 
         else: #normal
             self._colors[orig] = self._colors[dest]

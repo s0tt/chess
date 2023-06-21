@@ -56,6 +56,7 @@ class MoveGen:
         self.rook_moved_l_s = [[0, 0], [0, 0]]
         self.king_rook_l_s = [[np.array([57,58, 59]), np.array([61, 62])], [np.array([1, 2, 3]), np.array([5, 6])]]
         self.rook_idx_l_s = [[56, 63], [0, 7]]
+        self.castle_idx_l_s = [[57, 62], [1, 6]]
         self.king_idx = [60, 4]
         
 
@@ -296,7 +297,9 @@ class MoveGen:
                         nr_pieces_to_rook = len(self.king_rook_l_s[orig_color][i])
                         if sum(pieces[self.king_rook_l_s[orig_color][i]]) == -nr_pieces_to_rook: #check no pieces in castle corridor
                             if all([val not in self.protected[opponent_color] for val in self.king_rook_l_s[orig_color][i]]):
-                                castle_indices.add(self.rook_idx_l_s[orig_color][i])
+                                #castle_indices.add(self.rook_idx_l_s[orig_color][i])
+                                castle_indices.add(self.castle_idx_l_s[orig_color][i])
+                                
         return castle_indices
     
     # keep track if rook/king moved for casteling
