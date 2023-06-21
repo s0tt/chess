@@ -26,8 +26,8 @@ class PerftTest:
         self.result_stockfish = self.stockfish._perft(depth)
 
     def test(self):
-        for test_idx, test in enumerate(perft_testcases[15:]):
-            print(f"Running Testcase {test_idx}...")
+        for test_idx, test in enumerate(perft_testcases[11:]):
+            print(f"Running Testcase {test_idx} | FEN: {test['fen']}")
             self.GameModel.set_fen_string(test["fen"])
             self.draw()
             self.current_fen = test["fen"]
@@ -43,7 +43,7 @@ class PerftTest:
             print(
                 f"RESULT TC{test_idx}: {nodes}/{test['nodes']}/{self.result_stockfish['total']}/ Missing: {missing}")
 
-    def draw(self, delay=0.10):
+    def draw(self, delay=0.01):
         if self.draw_board:
             time.sleep(delay)
             self.GameModel.draw()

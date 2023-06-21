@@ -204,8 +204,10 @@ class MoveGen:
 
         # integrate promotion indices into move sets
         if len(pawn_promotions) > 0:
+            promotion_indices = set()
             for promotion_move in pawn_promotions:
                 dest, move_type = promotion_move
+                promotion_indices.add(dest)
                 is_capture = move_type & 0b0100 
                 if is_capture:
                     if dest in capture_moves:
@@ -213,10 +215,11 @@ class MoveGen:
                 else:
                     if dest in other_moves:
                         other_moves.add(promotion_move)
-            if dest in capture_moves:    
-                capture_moves.remove(dest)      
-            if dest in other_moves:    
-                other_moves.remove(dest)            
+            for idx in promotion_indices:
+                if idx in capture_moves:
+                    capture_moves.remove(idx)      
+                if idx in other_moves:    
+                    other_moves.remove(idx)            
 
         self.allowed_moves_piece[orig] = capture_moves.union(other_moves)
         if len(pin) > 0:
