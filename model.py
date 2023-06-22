@@ -272,10 +272,12 @@ class Model:
 
                     # if self.MoveGen.last_rows[piece_col][0] <= dest <= self.MoveGen.last_rows[piece_col][1]:
                     #     self._pieces[dest] = promote_piece
+
                     # en passant
-                    if dest in self.capture_moves and self._pieces[dest] < 0:
+                    if abs(orig-dest) != 8 and abs(orig-dest) != 16 and self._pieces[dest] < 0:
                         en_passant_piece_idx = self._last_moves[-1][1]
                         self._pieces[en_passant_piece_idx] = -1
+                        old_col = self._colors[en_passant_piece_idx]
                         self._colors[en_passant_piece_idx] = -1
                         is_capture = True
                         move_type = move_types["ep_capture"]
@@ -352,6 +354,8 @@ class Model:
             self._colors[orig] = self._colors[dest]
             if move_type == move_types["ep_capture"]:
                 ep_piece_offset = -8 if old_col == 0 else 8
+                self._colors[dest] = -1
+                self._pieces[dest] = -1
                 self._colors[dest+ep_piece_offset] = old_col
                 self._pieces[dest+ep_piece_offset] = piece_str_to_type["Pawn"]
             else:

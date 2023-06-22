@@ -105,6 +105,26 @@ perft_testcases = [
         "fen": "1k6/3p4/8/2P4r/K7/8/8/8 w - - 3 3"
     },
     {
+        "depth": 1,
+        "nodes": -1,
+        "fen": "8/k2p4/8/1KP4r/8/8/8/8 b - - 1 4"
+    },
+    {
+        "depth": 2,
+        "nodes": -1,
+        "fen": "8/k2p4/8/2P4r/1K6/8/8/8 w - - 0 4"
+    },
+    {
+        "depth": 2,
+        "nodes": -1,
+        "fen": "1k6/8/8/2Pp3r/1K6/8/8/8 w - d6 0 4 "
+    }, 
+    {
+        "depth": 3,
+        "nodes": -1,
+        "fen": "1k6/3p4/8/2P4r/1K6/8/8/8 b - - 2 3"
+    }, 
+    {
         "depth": 4,
         "nodes": -1,
         "fen": "2k5/3p4/8/2P4r/K7/8/8/8 b - - 2 2"

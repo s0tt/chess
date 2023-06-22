@@ -9,7 +9,7 @@ from testcases import perft_testcases
 
 
 class PerftTest:
-    def __init__(self, draw_board=True):
+    def __init__(self, draw_board=False):
         self.nodes = 0
         self.last_node_cnt = 0
         self.stockfish = Stockfish(
@@ -28,7 +28,7 @@ class PerftTest:
         self.result_stockfish = self.stockfish._perft(depth)
 
     def test(self):
-        for test_idx, test in enumerate(perft_testcases[16:]):
+        for test_idx, test in enumerate(perft_testcases[1:]):
             print(f"Running Testcase {test_idx} | FEN: {test['fen']}")
             self.GameModel.set_fen_string(test["fen"])
             self.draw()
@@ -45,7 +45,7 @@ class PerftTest:
             print(
                 f"RESULT TC{test_idx}: {nodes}/{test['nodes']}/{self.result_stockfish['total']}/ Missing: {missing}")
 
-    def draw(self, delay=0.25):
+    def draw(self, delay=0.15):
         if self.draw_board:
             time.sleep(delay)
             self.GameModel.draw()

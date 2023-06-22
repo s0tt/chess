@@ -51,6 +51,7 @@ class MoveGen:
         self.pawn_captures = [[-7, -9], [7, 9]]
         self.pawn_captures64 = [[-9, -11], [9, 11]]
         self.en_passant_square_idx = None
+        self.ep_cause_check_idx = set()
         self.pawn_capture_indices = set()
         self.king_moved = [0, 0] # move nr in which king was moved
         self.rook_moved_l_s = [[0, 0], [0, 0]]
@@ -63,6 +64,7 @@ class MoveGen:
         self.protected = [set(), set()] # protected square for both sides [white protected indices, black]
         self.check_indices = defaultdict(defaultdict(list).copy)#defaultdict(list)
         self.pin_indices = defaultdict(list)
+        self.ep_check_indices = defaultdict(list)
         self.allowed_moves_piece = defaultdict(list)
         self.pins = [set(), set()] #0: white pins which black pieces, 1: vice versa
         self.checks = set()
@@ -75,7 +77,9 @@ class MoveGen:
                 opponent_col = get_opponent_color(player_col)
                 #return set([orig, orig+self.pawn_moves[player_col][0]]), opponent_col
                 #TODO: check if en passant is pinned -> would cause check
-                return set([orig+self.pawn_moves[player_col][0]]), opponent_col
+                ep_square_idx = orig+self.pawn_moves[player_col][0]
+                if dest not in self.ep_check_indices or ep_square_idx in self.ep_check_indices[dest]: #check that ep doesn't cause check
+                    return set([orig+self.pawn_moves[player_col][0]]), opponent_col
         return set(), None
             
     def reset_board_states(self, reset_states=True):
@@ -86,11 +90,13 @@ class MoveGen:
             self.protected = [set(), set()]
             self.pins = [set(), set()]
             self.pin_indices = defaultdict(list)
+            self.ep_check_indices = defaultdict(list)
 
     def allowed_moves(self, orig, piece, pieces, colors, last_move, player_turn = None):
         capture_moves = set()
         other_moves = set()
         pawn_promotions = set()
+        ep_can_cause_check = []
         pin = []
         checks = []
         piece_color = colors[orig]
@@ -102,6 +108,7 @@ class MoveGen:
                 idx = orig
                 expand_piece_cnt = 0
                 expand_piece_idx = 0
+                ep_check_piece_idx = None
                 expanding = True
                 check_in_direction = False
                 all_idx = []
@@ -121,10 +128,18 @@ class MoveGen:
 
                             if expand_piece_cnt > 0:
                                 if pieces[idx] == piece_str_to_type["King"]:
-                                    self.pin_indices[expand_piece_idx] = all_idx
-                                    pin.append(expand_piece_idx)
+                                    if expand_piece_cnt == 1:
+                                        self.pin_indices[expand_piece_idx] = all_idx
+                                        pin.append(expand_piece_idx)
+                                    elif expand_piece_cnt >= 2:
+                                        if ep_check_piece_idx != None:
+                                            self.ep_check_indices[ep_check_piece_idx] = all_idx
+                                    expanding = False
+                                elif pieces[idx] == piece_str_to_type["Pawn"]:
+                                    pass
                                 #capture_moves.add(idx)
-                                expanding = False
+                                else:
+                                    expanding = False
                             else:
                                 if pieces[idx] == piece_str_to_type["King"]:
                                     self.check_indices[all_idx[0]][0] = all_idx.copy()
@@ -139,11 +154,16 @@ class MoveGen:
                             if expand_piece_cnt > 0:
                                 expanding = False
                             else:
+                                if pieces[idx] == piece_str_to_type["Pawn"] and self.slide[piece]: #pawn of same color
+                                    ep_check_piece_idx = idx
+
+                                    last_expand_same_col = False
                                 self.protected[piece_color].add(idx)
                         expand_piece_cnt += 1
                     else: # free space move
                         if piece == piece_str_to_type["King"]:
                             if idx in self.protected[get_opponent_color(piece_color)]:
+                                    self.protected[piece_color].add(idx)
                                     expanding = False
                                     break
                             other_moves.update(self.check_castling(orig, pieces, colors))
@@ -228,6 +248,8 @@ class MoveGen:
             self.pins[piece_color].add(pin[0])
         if len(checks) > 0:
             self.checks.add(checks[0])
+        if len(ep_can_cause_check) > 0:
+            self.ep_cause_check_idx.add()
 
         return capture_moves, other_moves
     
