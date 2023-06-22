@@ -74,8 +74,9 @@ class MoveGen:
                 player_col = colors[dest]
                 opponent_col = get_opponent_color(player_col)
                 #return set([orig, orig+self.pawn_moves[player_col][0]]), opponent_col
+                #TODO: check if en passant is pinned -> would cause check
                 return set([orig+self.pawn_moves[player_col][0]]), opponent_col
-        return None, None
+        return set(), None
             
     def reset_board_states(self, reset_states=True):
         self.allowed_moves_piece = defaultdict(list)
@@ -292,7 +293,7 @@ class MoveGen:
             if len(self.checks) > 0 and colors[next(iter(self.checks))] == opponent_color:
                 return castle_indices # if check of same color king is present -> no
             for i in range(2):
-                if pieces[self.rook_idx_l_s[orig_color][i]] == piece_str_to_type["Rook"]: 
+                if pieces[self.rook_idx_l_s[orig_color][i]] == piece_str_to_type["Rook"]: #check rook exists
                     if not self.rook_moved_l_s[orig_color][i]: #check rook not moved yet
                         nr_pieces_to_rook = len(self.king_rook_l_s[orig_color][i])
                         if sum(pieces[self.king_rook_l_s[orig_color][i]]) == -nr_pieces_to_rook: #check no pieces in castle corridor

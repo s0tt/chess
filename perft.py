@@ -6,8 +6,10 @@ import time
 from misc import *
 from stockfish import Stockfish
 from testcases import perft_testcases
+
+
 class PerftTest:
-    def __init__(self, draw_board=False):
+    def __init__(self, draw_board=True):
         self.nodes = 0
         self.last_node_cnt = 0
         self.stockfish = Stockfish(
@@ -26,7 +28,7 @@ class PerftTest:
         self.result_stockfish = self.stockfish._perft(depth)
 
     def test(self):
-        for test_idx, test in enumerate(perft_testcases[11:]):
+        for test_idx, test in enumerate(perft_testcases[16:]):
             print(f"Running Testcase {test_idx} | FEN: {test['fen']}")
             self.GameModel.set_fen_string(test["fen"])
             self.draw()
@@ -43,7 +45,7 @@ class PerftTest:
             print(
                 f"RESULT TC{test_idx}: {nodes}/{test['nodes']}/{self.result_stockfish['total']}/ Missing: {missing}")
 
-    def draw(self, delay=0.01):
+    def draw(self, delay=0.25):
         if self.draw_board:
             time.sleep(delay)
             self.GameModel.draw()
@@ -55,21 +57,26 @@ class PerftTest:
         if (depth == 0):
             return 1
 
+        dbg_fen = ""
+
         legal_moves = self.GameModel.generate_legal_moves()
-        #self.GameModel.print_board_state()
+        # self.GameModel.print_board_state()
         if nodes % 10000:
             print("\t\t Nodes:", nodes)
         for orig, all_dest in legal_moves.items():
-            if self.GameModel.player_turn != self.GameModel._colors[orig]:
+            if self.GameModel.player_turn != self.GameModel._colors[orig]: #check if move is players turn
                 continue
             for dest in all_dest:
                 len_last_move = len(self.GameModel._last_moves)
                 self.GameModel.move_piece(orig, dest)
-                #assert len_last_move + 1 == len(self.GameModel._last_moves) 
+                if depth == self.current_depth:
+                    dbg_fen = self.GameModel.get_fen_string()
+                    pass
+                # assert len_last_move + 1 == len(self.GameModel._last_moves)
                 self.draw()
                 nodes += self.perft(depth - 1)
                 self.GameModel.unmove_piece()
-                #assert len_last_move == len(self.GameModel._last_moves)
+                # assert len_last_move == len(self.GameModel._last_moves)
                 self.draw()
                 if print_intermediate and depth == self.current_depth:
                     if type(dest) == tuple:
@@ -82,8 +89,12 @@ class PerftTest:
                     d = self.GameModel.board2alphanum(dest_idx)
                     comb_move_str = str(o)+str(d)+dest_promo
                     self.res_detailed[comb_move_str] = nodes-self.last_node_cnt
+                    res_nodes = nodes-self.last_node_cnt
+                    res_expected = self.result_stockfish[comb_move_str]
+                    dbg_fen = "" if res_nodes == res_expected else dbg_fen
+
                     print(
-                        f"\t {comb_move_str}: {nodes-self.last_node_cnt} / {self.result_stockfish[comb_move_str]} <- Stockfish")
+                        f"\t {comb_move_str}: {res_nodes} / {res_expected} -> DBG FEN: {dbg_fen}")
                     self.last_node_cnt = nodes
         return nodes
 

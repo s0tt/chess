@@ -119,15 +119,15 @@ class Model:
         castling_string = ""
         for i in range(2):
             if not self.MoveGen.king_moved[i]:
-                if not self.MoveGen.rook_moved_l_s[1]:
+                if not self.MoveGen.rook_moved_l_s[i][1]:
                     castling_string += "K" if i == 0 else "k"
-                if not self.MoveGen.rook_moved_l_s[0]:
+                if not self.MoveGen.rook_moved_l_s[i][0]:
                     castling_string += "Q" if i == 0 else "q"
         fen_string += castling_string if len(castling_string) > 0 else "-"
         en_passant_indices, _ = self.MoveGen.check_en_passant(
             self._pieces, self._colors, self._last_moves[-1])
-        fen_string += " " + self.board2alphanum(en_passant_indices[0]) if (
-            en_passant_indices != None and len(en_passant_indices)) > 0 else " -"
+        fen_string += " " + self.board2alphanum(next(iter(en_passant_indices))) if (
+            len(en_passant_indices)) > 0 else " -"
         fen_string += " " + str(self.half_moves_50_check)
         fen_string += " " + str(self.move_nr)
         return fen_string
@@ -154,10 +154,10 @@ class Model:
 
         self.player_turn = 0 if str_parts[1] == "w" else 1
         # castling
-        self.MoveGen.rook_moved_l_s[1][1] = "k" not in str_parts[2]
-        self.MoveGen.rook_moved_l_s[1][0] = "q" not in str_parts[2]
-        self.MoveGen.rook_moved_l_s[0][1] = "K" not in str_parts[2]
-        self.MoveGen.rook_moved_l_s[0][0] = "Q" not in str_parts[2]
+        self.MoveGen.rook_moved_l_s[1][1] = 1 if "k" not in str_parts[2] else 0
+        self.MoveGen.rook_moved_l_s[1][0] = 1 if "q" not in str_parts[2] else 0
+        self.MoveGen.rook_moved_l_s[0][1] = 1 if "K" not in str_parts[2] else 0
+        self.MoveGen.rook_moved_l_s[0][0] = 1 if "Q" not in str_parts[2] else 0
         if "-" in str_parts[2]:
             self.king_moved = True
 
@@ -264,8 +264,11 @@ class Model:
                         self._pieces[orig] = -1
 
                         # set color
+                        if not move_type & 0b0100: #if not is capture
+                            old_col = self._colors[orig]
                         self._colors[dest] = self._colors[orig]
                         self._colors[orig] = -1
+                        
 
                     # if self.MoveGen.last_rows[piece_col][0] <= dest <= self.MoveGen.last_rows[piece_col][1]:
                     #     self._pieces[dest] = promote_piece
@@ -298,11 +301,14 @@ class Model:
                     last_move_type = move_type
                 elif is_capture:
                     last_move_type = move_types["capture"]
-                    # if is capture check castling compromised or still possible
-                    if self._pieces[dest]:
-                        for i in range(2):
-                            if dest == self.MoveGen.rook_idx_l_s[old_col][i]:
-                                self.MoveGen.rook_moved_l_s[old_col][i] = True
+                    # if is capture of rook check castling compromised or still possible
+
+
+                    # TODO: NOT NEEDED anymore
+                    #if self._pieces[dest]:
+                    #    for i in range(2):
+                    #        if dest == self.MoveGen.rook_idx_l_s[old_col][i]:
+                    #            self.MoveGen.rook_moved_l_s[old_col][i] = True
 
                 self._last_moves.append(
                     (orig, dest, last_move_type, old_piece, old_col))
@@ -312,8 +318,11 @@ class Model:
                 # update player turn black->white , white -> black
                 self.move_nr += 1 if self.player_turn == 1 else 0
                 self.player_turn ^= 1
-                self.half_moves_50_check = 0 if (
-                    piece == 1 or is_capture) else self.half_moves_50_check+1
+                if (piece == 1 or is_capture or is_castling):
+                    self.old_moves_50_check = self.half_moves_50_check
+                    self.half_moves_50_check = 0 
+                else:
+                    self.half_moves_50_check += 1
 
     def play_sound(self, sound_type):
         if self._view != None and self._sounds == True:
@@ -329,7 +338,7 @@ class Model:
         self.player_turn = get_opponent_color(self.player_turn)
         self.move_nr -= 1 if self.player_turn == 1 else 0
         orig, dest, move_type, old_piece, old_col = self._last_moves.pop()
-        self.half_moves_50_check -= 1
+
 
 
         if move_type & 0b0100: #is_capture
@@ -351,7 +360,7 @@ class Model:
 
         elif move_type & 0b1000: #is_promotion
             self._colors[orig] = old_col
-            self._pieces[orig] = old_piece
+            self._pieces[orig] = 1
             self._colors[dest] = -1
             self._pieces[dest] = -1
         elif move_type == 2 or move_type == 3: #castling
@@ -387,6 +396,16 @@ class Model:
                 self.MoveGen.rook_moved_l_s[i][0] = 0             
             if self.MoveGen.rook_moved_l_s[i][1] == self.move_nr:
                 self.MoveGen.rook_moved_l_s[i][1] = 0
+
+
+        if (self._pieces[orig] == 1 or move_type & 0b0100 or move_type == 2 or move_type == 3):
+            #assert self.half_moves_50_check == 0
+            self.half_moves_50_check = self.old_moves_50_check
+        else:
+            #assert self.half_moves_50_check > 0
+            self.half_moves_50_check -= 1            
+
+            
 
     def calc_attacks(self):
         for i, true_val in enumerate([True, False]):
