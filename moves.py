@@ -53,11 +53,14 @@ class MoveGen:
         self.en_passant_square_idx = None
         self.ep_cause_check_idx = set()
         self.pawn_capture_indices = set()
+
+        self.allow_castling = [[True, True], [True, True]]
+        self.allow_castling_king = True
         self.king_moved = [0, 0] # move nr in which king was moved
         self.rook_moved_l_s = [[0, 0], [0, 0]]
         self.king_rook_l_s = [[np.array([57,58, 59]), np.array([61, 62])], [np.array([1, 2, 3]), np.array([5, 6])]]
         self.rook_idx_l_s = [[56, 63], [0, 7]]
-        self.castle_idx_l_s = [[57, 62], [1, 6]]
+        self.castle_idx_l_s = [[58, 62], [2, 6]]
         self.king_idx = [60, 4]
         
 
@@ -107,7 +110,7 @@ class MoveGen:
             for i in range(self.offsets[piece][0]):
                 idx = orig
                 expand_piece_cnt = 0
-                expand_piece_idx = 0
+                expand_piece_idx = None
                 ep_check_piece_idx = None
                 expanding = True
                 check_in_direction = False
@@ -126,11 +129,12 @@ class MoveGen:
                                     expanding = False
                                     break
 
-                            if expand_piece_cnt > 0:
+                            if expand_piece_cnt > 0: #>1 piece in ray
                                 if pieces[idx] == piece_str_to_type["King"]:
                                     if expand_piece_cnt == 1:
-                                        self.pin_indices[expand_piece_idx] = all_idx
-                                        pin.append(expand_piece_idx)
+                                        if expand_piece_idx != None:
+                                            self.pin_indices[expand_piece_idx] = all_idx
+                                            pin.append(expand_piece_idx)
                                     elif expand_piece_cnt >= 2:
                                         if ep_check_piece_idx != None:
                                             self.ep_check_indices[ep_check_piece_idx] = all_idx
@@ -140,18 +144,22 @@ class MoveGen:
                                 #capture_moves.add(idx)
                                 else:
                                     expanding = False
-                            else:
+                            else: #first piece in ray
                                 if pieces[idx] == piece_str_to_type["King"]:
                                     self.check_indices[all_idx[0]][0] = all_idx.copy()
                                     checks.append(all_idx[0])
                                     check_in_direction = True
                                     #expanding = False
+                                # elif pieces[idx] == piece_str_to_type["Pawn"]: #enemy pawn -> ep check
+                                #     ep_check_piece_idx
                                 else:
                                     expand_piece_idx = idx                   
                                 capture_moves.add(idx)
                         else: # field of same color
                             last_expand_same_col = True
                             if expand_piece_cnt > 0:
+                                if check_in_direction:
+                                    self.protected[piece_color].add(idx)
                                 expanding = False
                             else:
                                 if pieces[idx] == piece_str_to_type["Pawn"] and self.slide[piece]: #pawn of same color
@@ -200,12 +208,16 @@ class MoveGen:
                         #capture attacking piece
                         # If king all captures are allowed as already checked for protection
                         capture_moves = set(self.checks).intersection(capture_moves)
+                        # if piece == piece_str_to_type["Pawn"]:
+                        #     if len(ep_indices) > 0 and next(iter(ep_indices))+self.pawn_moves[get_opponent_color(piece_color)][0] in self.checks:
+                        #         # ep catpure would stop check
+                        #         capture_moves.add(next(iter(ep_indices)))
                     elif piece == piece_str_to_type["King"]: #move king out to free square
                         access_idx = 1 if len(check_indices_vals) > 1 else 0
                         other_moves = other_moves - set(check_indices_vals[access_idx] if type(check_indices_vals[access_idx]) == list else [check_indices_vals[access_idx]])
                     
                     
-                    
+                    # ep capture would stop check --> Piece capture
                     if piece == 1 and ep_indices != None and len(ep_indices) > 0:
                         ep_capture_field = next(iter(ep_indices))
                         ep_piece_idx_offset = -8 if piece_color == 1 else 8
@@ -283,6 +295,7 @@ class MoveGen:
         # check captures with board boundaries
         en_passant_color = None
         en_passant_indices = set()
+        valid_en_passant_indices = set()
         pawn_protected = set()
         self.pawn_capture_indices = set()
         for move_idx, move_type in zip([0, 1],[move_l_cptr, move_r_cptr]):
@@ -304,8 +317,10 @@ class MoveGen:
                         en_passant_indices, en_passant_color = self.check_en_passant(pieces, colors, last_move)
                     if en_passant_color == orig_color:
                         if move_type in en_passant_indices:
-                            capture_moves.add(move_type)
-        return capture_moves, other_moves, promotion_move, en_passant_indices
+                            if orig not in self.pins[get_opponent_color(orig_color)] or move_type in self.pin_indices[orig]:#check that ep is pinned -> doesn't cause check
+                                capture_moves.add(move_type)
+                                valid_en_passant_indices.add(move_type)
+        return capture_moves, other_moves, promotion_move, valid_en_passant_indices
 
     def check_castling(self, orig, pieces, colors):
         orig_color = colors[orig]
@@ -319,7 +334,7 @@ class MoveGen:
                     if not self.rook_moved_l_s[orig_color][i]: #check rook not moved yet
                         nr_pieces_to_rook = len(self.king_rook_l_s[orig_color][i])
                         if sum(pieces[self.king_rook_l_s[orig_color][i]]) == -nr_pieces_to_rook: #check no pieces in castle corridor
-                            if all([val not in self.protected[opponent_color] for val in self.king_rook_l_s[orig_color][i]]):
+                            if all([val not in self.protected[opponent_color] for val in self.king_rook_l_s[orig_color][i][abs(i-1):]]):
                                 #castle_indices.add(self.rook_idx_l_s[orig_color][i])
                                 castle_indices.add(self.castle_idx_l_s[orig_color][i])
                                 
@@ -332,8 +347,17 @@ class MoveGen:
         elif piece == piece_str_to_type["Rook"]:
             if board_idx == self.rook_idx_l_s[color][0] and self.rook_moved_l_s[color][0] == 0:
                 self.rook_moved_l_s[color][0] = move_nr
-            elif board_idx == self.rook_idx_l_s[color][1] and self.rook_moved_l_s[color][0] == 0:
+            elif board_idx == self.rook_idx_l_s[color][1] and self.rook_moved_l_s[color][1] == 0:
                 self.rook_moved_l_s[color][1] = move_nr
+
+    def reset_pieces_moved(self, move_nr, color):
+        if self.king_moved[color] == move_nr and self.allow_castling_king:
+            self.king_moved[color] = 0 
+        if self.rook_moved_l_s[color][0] == move_nr and self.allow_castling[color][0]:
+            self.rook_moved_l_s[color][0] = 0             
+        if self.rook_moved_l_s[color][1] == move_nr and self.allow_castling[color][1]:
+            self.rook_moved_l_s[color][1] = 0
+
 
 
     

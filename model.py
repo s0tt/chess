@@ -158,8 +158,18 @@ class Model:
         self.MoveGen.rook_moved_l_s[1][0] = 1 if "q" not in str_parts[2] else 0
         self.MoveGen.rook_moved_l_s[0][1] = 1 if "K" not in str_parts[2] else 0
         self.MoveGen.rook_moved_l_s[0][0] = 1 if "Q" not in str_parts[2] else 0
+
+        self.MoveGen.allow_castling[1][1] = False if "k" not in str_parts[2] else True
+        self.MoveGen.allow_castling[1][0] = False if "q" not in str_parts[2] else True
+        self.MoveGen.allow_castling[0][1] = False if "K" not in str_parts[2] else True
+        self.MoveGen.allow_castling[0][0] = False if "Q" not in str_parts[2] else True
+
         if "-" in str_parts[2]:
-            self.king_moved = True
+            self.MoveGen.allow_castling_king = False
+            self.MoveGen.king_moved = [1, 1]
+        else:
+            self.MoveGen.allow_castling_king = True
+            self.MoveGen.king_moved = [0, 0]
 
         # en passant (ep)
         if str_parts[3] != "-":
@@ -230,12 +240,13 @@ class Model:
                 if piece == 6:
                     self.MoveGen.set_piece_moved(
                         piece, self._colors[orig], orig, self.move_nr)
-                    if 1 < abs(orig-dest) < 6: #if self._pieces[dest] == 4:  # castling
+                    if orig == self.MoveGen.king_idx[piece_col] and dest in self.MoveGen.castle_idx_l_s[piece_col]: #if self._pieces[dest] == 4:  # castling
                         is_capture = False
                         is_castling = True
+                        #set rook moved state
 
                         self.play_sound("castle")
-                        if abs(orig - dest) == 3:  # long castle
+                        if dest == self.MoveGen.castle_idx_l_s[piece_col][0]:  # long castle
                             move_type = move_types["castle_queen"]
                             self._pieces[orig-2] = 6
                             self._pieces[orig-1] = 4
@@ -243,7 +254,9 @@ class Model:
                             self._colors[orig-1] = self._colors[orig]
                             self._colors[orig-4] = -1
                             self._pieces[orig-4] = -1
-                        elif abs(orig - dest) == 2:  # short castle
+                            self.MoveGen.set_piece_moved(
+                                4, piece_col, self.MoveGen.rook_idx_l_s[piece_col][0], self.move_nr)
+                        elif dest == self.MoveGen.castle_idx_l_s[piece_col][1]:  # short castle
                             move_type = move_types["castle_king"]
                             self._pieces[orig+2] = 6
                             self._pieces[orig+1] = 4
@@ -251,6 +264,8 @@ class Model:
                             self._colors[orig+1] = self._colors[orig]
                             self._colors[orig+3] = -1
                             self._pieces[orig+3] = -1
+                            self.MoveGen.set_piece_moved(
+                                4, piece_col, self.MoveGen.rook_idx_l_s[piece_col][1], self.move_nr)
                         old_col = self._colors[orig]
                         self._colors[orig] = -1
                         self._pieces[orig] = -1
@@ -368,14 +383,14 @@ class Model:
             self._colors[dest] = -1
             self._pieces[dest] = -1
         elif move_type == 2 or move_type == 3: #castling
-            if abs(orig - dest) == 3: #long castle
+            if move_type == 3: #long castle
                 self._pieces[orig-2] = -1
                 self._pieces[orig-1] = -1
                 self._colors[orig-2] = -1
                 self._colors[orig-1] = -1
                 self._colors[orig-4] = old_col
                 self._pieces[orig-4] = 4 
-            elif abs(orig - dest) ==  2: #short castle
+            elif move_type == 2: #short castle king side
                 self._pieces[orig+2] = -1
                 self._pieces[orig+1] = -1
                 self._colors[orig+2] = -1
@@ -393,13 +408,7 @@ class Model:
             self._pieces[dest] = -1
         
         # reset moved states if 
-        for i in range(2):
-            if self.MoveGen.king_moved[i] == self.move_nr:
-                self.MoveGen.king_moved[i] = 0 
-            if self.MoveGen.rook_moved_l_s[i][0] == self.move_nr:
-                self.MoveGen.rook_moved_l_s[i][0] = 0             
-            if self.MoveGen.rook_moved_l_s[i][1] == self.move_nr:
-                self.MoveGen.rook_moved_l_s[i][1] = 0
+        self.MoveGen.reset_pieces_moved(self.move_nr, self._colors[orig])
 
 
         if (self._pieces[orig] == 1 or move_type & 0b0100 or move_type == 2 or move_type == 3):

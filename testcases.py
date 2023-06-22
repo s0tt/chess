@@ -9,17 +9,12 @@ perft_testcases = [
         "nodes": 400,
         "fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
     },
-    # {
-    #    "depth":6,
-    #    "nodes":119060324,
-    #    "fen":"rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
-    # },
-    {
+    { 
         "depth": 1,
         "nodes": 8,
         "fen": "r6r/1b2k1bq/8/8/7B/8/8/R3K2R b KQ - 3 2"
     },
-    {
+    { #3
         "depth": 1,
         "nodes": 8,
         "fen": "8/8/8/2k5/2pP4/8/B7/4K3 b - d3 0 3"
@@ -39,7 +34,7 @@ perft_testcases = [
         "nodes": 44,
         "fen": "2kr3r/p1ppqpb1/bn2Qnp1/3PN3/1p2P3/2N5/PPPBBPPP/R3K2R b KQ - 3 2"
     },
-    {
+    { #7
         "depth": 1,
         "nodes": 39,
         "fen": "rnb2k1r/pp1Pbppp/2p5/q7/2B5/8/PPPQNnPP/RNB1K2R w KQ - 3 9"
@@ -54,30 +49,10 @@ perft_testcases = [
         "nodes": 1486,
         "fen": "rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w KQ - 1 8"
     },
-    {
+    { #10
         "depth": 2,
         "nodes": 1652,
         "fen": "rnNq1k1r/pp2bppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R b KQkq - 0 8"
-    },
-    # {
-    #     "depth": 2,
-    #     "nodes": -1,
-    #     "fen": "rnQq1k1r/pp11bppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w KQ - 1 8"
-    # },
-    {
-        "depth": 1,
-        "nodes": -1,
-        "fen": "rnb11k1r/pp1Pbppp/Bqp5/8/8/8/PPP1NnPP/RNBQK2R w KQ - 1 9"
-    },
-    {
-        "depth": 1,
-        "nodes": -1,
-        "fen": "rnb1qk1r/pp1pbppp/B1p5/8/8/8/PPP1NnPP/RNBQK2R w KQ - 1 9"
-    },
-    {
-        "depth": 2,
-        "nodes": -1,
-        "fen": "rnbq1k1r/pp1Pbppp/B1p5/8/8/8/PPP1NnPP/RNBQK2R b KQ - 1 8"
     },
     {
         "depth": 3,
@@ -89,52 +64,6 @@ perft_testcases = [
         "nodes": 89890,
         "fen": "r4rk1/1pp1qppp/p1np1n2/2b1p1B1/2B1P1b1/P1NP1N2/1PP1QPPP/R4RK1 w - - 0 10"
     },
-    {
-        "depth": 1,
-        "nodes": -1,
-        "fen": "1k6/8/8/1KPp3r/8/8/8/8 w - d6 0 4"
-    },
-    {
-        "depth": 2,
-        "nodes": -1,
-        "fen": "1k6/3p4/8/1KP4r/8/8/8/8 b - - 0 3"
-    },
-    {
-        "depth": 3,
-        "nodes": -1,
-        "fen": "1k6/3p4/8/2P4r/K7/8/8/8 w - - 3 3"
-    },
-    {
-        "depth": 1,
-        "nodes": -1,
-        "fen": "8/k2p4/8/1KP4r/8/8/8/8 b - - 1 4"
-    },
-    {
-        "depth": 2,
-        "nodes": -1,
-        "fen": "8/k2p4/8/2P4r/1K6/8/8/8 w - - 0 4"
-    },
-    {
-        "depth": 2,
-        "nodes": -1,
-        "fen": "1k6/8/8/2Pp3r/1K6/8/8/8 w - d6 0 4 "
-    }, 
-    {
-        "depth": 3,
-        "nodes": -1,
-        "fen": "1k6/3p4/8/2P4r/1K6/8/8/8 b - - 2 3"
-    }, 
-    {
-        "depth": 4,
-        "nodes": -1,
-        "fen": "2k5/3p4/8/2P4r/K7/8/8/8 b - - 2 2"
-    },    
-    {
-        "depth": 5,
-        "nodes": -1,
-        "fen": "2k5/3p4/8/K1P4r/8/8/8/8 w - - 1 2"
-    },
-    
     {
         "depth": 6,
         "nodes": 1134888,
@@ -155,11 +84,11 @@ perft_testcases = [
         "nodes": 661072,
         "fen": "5k2/8/8/8/8/8/8/4K2R w K - 0 1"
     },
-    {
+    { #30
         "depth": 6,
         "nodes": 803711,
         "fen": "3k4/8/8/8/8/8/8/R3K3 w Q - 0 1"
-    },
+    },   
     {
         "depth": 4,
         "nodes": 1274206,
@@ -205,4 +134,14 @@ perft_testcases = [
         "nodes": 23527,
         "fen": "8/8/2k5/5q2/5n2/8/5K2/8 b - - 0 1"
     }
+]
+
+
+perft_manual_test = [
+    {
+        "depth": 1,
+        "nodes": -1,
+        "fen": "r6r/RbBk2bq/8/8/8/8/8/4K2R b K - 1 2"
+    },
+    
 ]
