@@ -8,6 +8,9 @@ ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
 
 
 class Board:
+    """View class according to MVC pattern.
+    Represent visual board by drawing onto the screen and handles sounds effets for visualization.
+    """
     def __init__(self, board_dim=8, screen_dim=(1280, 720), square_dim=8) -> None:
         os.environ['SDL_VIDEO_WINDOW_POS'] = "%d,%d" % (100, 100)
         self.mixer = pygame.mixer.init()
@@ -16,6 +19,7 @@ class Board:
         self._board_dim = board_dim
         self._screen_dim = screen_dim
         self._square_dim = square_dim
+        self.draw_numbers = False
         # self._surface = pygame.Surface(screen_dim)
 
         self._highlights = np.array([0, 0, 0, 0, 0, 0, 0, 0,
@@ -46,7 +50,8 @@ class Board:
 
     def draw(self, pieces, colors, attacks):
         self.draw_board(self.display, attacks=attacks)
-        self.draw_numbers(self.display)
+        if self.draw_numbers:
+            self.draw_numbers(self.display)
         self.draw_pieces(self.display, pieces, colors)
 
     def piece_to_image(self, piece_num, color):

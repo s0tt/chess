@@ -3,9 +3,9 @@ from misc import *
 from view import Board
 from model import Model
 
-# pygame setup
-
 class Controller:
+    """Controller according to MVC pattern. Handles user input and interaction.
+    """
     def __init__(self) -> None:
         pygame.init()
         

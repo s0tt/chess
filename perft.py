@@ -14,7 +14,7 @@ class PerftTest:
     Divide is possible to recurse down the tree of possible moves.
     """
 
-    def __init__(self, draw_board=False):
+    def __init__(self, draw_board=True):
         """_summary_
 
         Args:
@@ -81,7 +81,7 @@ class PerftTest:
         if len(missing) > 0:
             pass
 
-    def draw(self, depth=None, delay=0.5):
+    def draw(self, depth=None, delay=0.001):
         if self.draw_board or (self.draw_depth_1 and depth == 1):
             time.sleep(delay)
             self.GameModel.draw()

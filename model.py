@@ -6,7 +6,10 @@ from view import Board
 
 
 class Model:
-    def __init__(self, view : Board, board_dim=8, sounds=True, fen_init="r6r/1b2k1bq/8/8/7B/8/8/R3K2R b KQ - 3 2"):
+    """Model according to MVC pattern representing internal board data states.
+        Handles everything from board arrangment of pieces/colors, nr of moves, player turns, FEN string handling etc.
+    """
+    def __init__(self, view : Board, board_dim=8, sounds=True, fen_init=""):
         #    Now we have the mailbox array, so called because it looks like a
         #    mailbox, at least according to Bob Hyatt. This is useful when we
         #    need to figure out what pieces can go where. Let's say we have a

@@ -6,6 +6,8 @@ from collections import defaultdict
 
 
 class MoveGen:
+    """Handles chess move generation by calculating available moves according to FIDE chess rules.
+    """
     def __init__(self):
         #    Now we have the mailbox array, so called because it looks like a
         #    mailbox, at least according to Bob Hyatt. This is useful when we
