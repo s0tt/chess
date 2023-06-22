@@ -6,9 +6,10 @@ import os
 
 ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
 
+
 class Board:
     def __init__(self, board_dim=8, screen_dim=(1280, 720), square_dim=8) -> None:
-        os.environ['SDL_VIDEO_WINDOW_POS'] = "%d,%d" % (100,100)
+        os.environ['SDL_VIDEO_WINDOW_POS'] = "%d,%d" % (100, 100)
         self.mixer = pygame.mixer.init()
         self.display = pygame.display.set_mode((720, 720))
         self.display.fill("#bdbdb3")
@@ -51,25 +52,29 @@ class Board:
     def piece_to_image(self, piece_num, color):
         if 0 < piece_num < len(piece_types)+1:
             if color >= 0:
-                img_path = os.path.join(ROOT_DIR, *self._image_paths[color].split("/"), str(piece_num)+".png")
+                img_path = os.path.join(
+                    ROOT_DIR, *self._image_paths[color].split("/"), str(piece_num)+".png")
                 img = pygame.image.load(img_path)
                 return img
-            
+
     def play_sound(self, event_type):
         if event_type in self._audio_paths:
-            sound_path = os.path.join(ROOT_DIR, *self._audio_paths[event_type].split("/"))
+            sound_path = os.path.join(
+                ROOT_DIR, *self._audio_paths[event_type].split("/"))
             sound = pygame.mixer.Sound(sound_path)
             sound.play()
         else:
             raise ValueError("Wrong sound type in play_sound")
 
-    
     def draw_turn_indicator(self, color):
-        img =  pygame.font.SysFont(None, 24).render(str("Move indicator:"), True, "#000000")
+        img = pygame.font.SysFont(None, 24).render(
+            str("Move indicator:"), True, "#000000")
         rectangle = pygame.Rect(
-                    self._square_dim, self._board_dim+1 , (self._square_dim*2), (self._square_dim//2))
-        pygame.draw.rect(self.display, player_colors[col_int_to_str[color]], rectangle,0)  # fill rectangle
-        self.display.blit(img, (self._square_dim, self._board_dim+1 ))
+            self._square_dim, self._board_dim+1, (self._square_dim*2), (self._square_dim//2))
+        # fill rectangle
+        pygame.draw.rect(
+            self.display, player_colors[col_int_to_str[color]], rectangle, 0)
+        self.display.blit(img, (self._square_dim, self._board_dim+1))
 
     def draw_pieces(self, display, pieces, colors):
         for pos in range(self._board_dim**2):
@@ -83,11 +88,12 @@ class Board:
 
     def draw_numbers(self, display):
         for pos in range(self._board_dim**2):
-            img =  pygame.font.SysFont(None, 24).render(str(pos), True, "#000000")
+            img = pygame.font.SysFont(None, 24).render(
+                str(pos), True, "#000000")
             if img:
                 display.blit(img, ((pos % self._board_dim) *
-                                    self._square_dim, (pos//self._board_dim) *
-                                    self._square_dim))
+                                   self._square_dim, (pos//self._board_dim) *
+                                   self._square_dim))
 
     def draw_board(self, display, draw_highlights=True, draw_last_move=True, attacks=[]):
         for row in range(self._board_dim):
@@ -112,11 +118,11 @@ class Board:
 
     def get_rects(self):
         return self._rects
-    
-    def set_last_move(self, indices : set):
+
+    def set_last_move(self, indices: set):
         self._last_move_indices = indices
 
-    def change_highlights(self, indices : set, activate=True, all=False):
+    def change_highlights(self, indices: set, activate=True, all=False):
         if not all:
             if indices == None:
                 return
@@ -135,5 +141,3 @@ class Board:
             return row*self._board_dim + col
         else:
             return row, col
-
-

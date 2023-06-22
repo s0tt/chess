@@ -2,10 +2,11 @@ import numpy as np
 from misc import *
 import functools
 from moves import MoveGen
+from view import Board
 
 
 class Model:
-    def __init__(self, view, board_dim=8, sounds=True, fen_init="r6r/1b2k1bq/8/8/7B/8/8/R3K2R b KQ - 3 2"):
+    def __init__(self, view : Board, board_dim=8, sounds=True, fen_init="r6r/1b2k1bq/8/8/7B/8/8/R3K2R b KQ - 3 2"):
         #    Now we have the mailbox array, so called because it looks like a
         #    mailbox, at least according to Bob Hyatt. This is useful when we
         #    need to figure out what pieces can go where. Let's say we have a
@@ -53,14 +54,13 @@ class Model:
         self.half_moves_50_check = 0
 
         self.mouse_piece, self.orig = None, None
-        self._last_moves = [(35, 35, False, -1, -1)]
+        self._last_moves = [(35, 35, False, -1, -1)] # Tuple of: orig, dest, move_type, old_piece, old_color
         self.allowed_moves = set()
 
         self.capture_moves = set()
         self.other_moves = set()
         self.promotion_moves = set()
-        # self.pins = [[], []]
-        # self.checks = []
+
         if len(fen_init) > 0:
             self.set_fen_string(fen_init)
 
@@ -240,13 +240,15 @@ class Model:
                 if piece == 6:
                     self.MoveGen.set_piece_moved(
                         piece, self._colors[orig], orig, self.move_nr)
-                    if orig == self.MoveGen.king_idx[piece_col] and dest in self.MoveGen.castle_idx_l_s[piece_col]: #if self._pieces[dest] == 4:  # castling
+                    # if self._pieces[dest] == 4:  # castling
+                    if orig == self.MoveGen.king_idx[piece_col] and dest in self.MoveGen.castle_idx_l_s[piece_col]:
                         is_capture = False
                         is_castling = True
-                        #set rook moved state
+                        # set rook moved state
 
                         self.play_sound("castle")
-                        if dest == self.MoveGen.castle_idx_l_s[piece_col][0]:  # long castle
+                        # long castle
+                        if dest == self.MoveGen.castle_idx_l_s[piece_col][0]:
                             move_type = move_types["castle_queen"]
                             self._pieces[orig-2] = 6
                             self._pieces[orig-1] = 4
@@ -256,7 +258,8 @@ class Model:
                             self._pieces[orig-4] = -1
                             self.MoveGen.set_piece_moved(
                                 4, piece_col, self.MoveGen.rook_idx_l_s[piece_col][0], self.move_nr)
-                        elif dest == self.MoveGen.castle_idx_l_s[piece_col][1]:  # short castle
+                        # short castle
+                        elif dest == self.MoveGen.castle_idx_l_s[piece_col][1]:
                             move_type = move_types["castle_king"]
                             self._pieces[orig+2] = 6
                             self._pieces[orig+1] = 4
@@ -270,7 +273,6 @@ class Model:
                         self._colors[orig] = -1
                         self._pieces[orig] = -1
 
-
                 if piece == 1:
                     # #pawn promotion
                     if is_promotion and move_type != None:
@@ -279,14 +281,10 @@ class Model:
                         self._pieces[orig] = -1
 
                         # set color
-                        if not move_type & 0b0100: #if not is capture
+                        if not move_type & 0b0100:  # if not is capture
                             old_col = self._colors[orig]
                         self._colors[dest] = self._colors[orig]
                         self._colors[orig] = -1
-                        
-
-                    # if self.MoveGen.last_rows[piece_col][0] <= dest <= self.MoveGen.last_rows[piece_col][1]:
-                    #     self._pieces[dest] = promote_piece
 
                     # en passant
                     if abs(orig-dest) != 8 and abs(orig-dest) != 16 and self._pieces[dest] < 0:
@@ -307,11 +305,6 @@ class Model:
                     # call sound making
                     self.play_sound("capture" if is_capture else "move")
 
-                    # if dest in self.MoveGen.pins[self._colors[dest]]:
-                    #     # recalc attacks after capture check
-                    #     reset_check = False
-                    #     self.calc_attacks()
-
                 # save performed move
                 last_move_type = move_types["quiet"]
                 if move_type != None:
@@ -319,14 +312,6 @@ class Model:
                 elif is_capture:
                     last_move_type = move_types["capture"]
                     # if is capture of rook check castling compromised or still possible
-
-
-                    # TODO: NOT NEEDED anymore
-                    #if self._pieces[dest]:
-                    #    for i in range(2):
-                    #        if dest == self.MoveGen.rook_idx_l_s[old_col][i]:
-                    #            self.MoveGen.rook_moved_l_s[old_col][i] = True
-
                 self._last_moves.append(
                     (orig, dest, last_move_type, old_piece, old_col))
                 if self._view is not None:
@@ -337,7 +322,7 @@ class Model:
                 self.player_turn ^= 1
                 if (piece == 1 or is_capture or is_castling):
                     self.old_moves_50_check = self.half_moves_50_check
-                    self.half_moves_50_check = 0 
+                    self.half_moves_50_check = 0
                 else:
                     self.half_moves_50_check += 1
 
@@ -349,20 +334,17 @@ class Model:
         if not orig or not dest:
             orig, dest, move_type, old_piece, old_col = self._last_moves[-1]
         print_board_string(orig, dest, self._pieces, self._colors)
-        
-                
+
     def unmove_piece(self):
         self.player_turn = get_opponent_color(self.player_turn)
         self.move_nr -= 1 if self.player_turn == 1 else 0
         orig, dest, move_type, old_piece, old_col = self._last_moves.pop()
 
-
-
-        if move_type & 0b0100: #is_capture
+        if move_type & 0b0100:  # is_capture
             # replace captured piece
-            if move_type & 0b1000: #is_promotion
+            if move_type & 0b1000:  # is_promotion
                 # replace pawn back
-                self._pieces[orig] = 1 #pawn               
+                self._pieces[orig] = 1  # pawn
             else:
                 # move other piece back
                 self._pieces[orig] = self._pieces[dest]
@@ -377,63 +359,55 @@ class Model:
                 self._colors[dest] = old_col
                 self._pieces[dest] = old_piece
 
-        elif move_type & 0b1000: #is_promotion
+        elif move_type & 0b1000:  # is_promotion
             self._colors[orig] = old_col
             self._pieces[orig] = 1
             self._colors[dest] = -1
             self._pieces[dest] = -1
-        elif move_type == 2 or move_type == 3: #castling
-            if move_type == 3: #long castle
+        elif move_type == 2 or move_type == 3:  # castling
+            if move_type == 3:  # long castle
                 self._pieces[orig-2] = -1
                 self._pieces[orig-1] = -1
                 self._colors[orig-2] = -1
                 self._colors[orig-1] = -1
                 self._colors[orig-4] = old_col
-                self._pieces[orig-4] = 4 
-            elif move_type == 2: #short castle king side
+                self._pieces[orig-4] = 4
+            elif move_type == 2:  # short castle king side
                 self._pieces[orig+2] = -1
                 self._pieces[orig+1] = -1
                 self._colors[orig+2] = -1
                 self._colors[orig+1] = -1
                 self._colors[orig+3] = old_col
-                self._pieces[orig+3] = 4        
+                self._pieces[orig+3] = 4
             self._colors[orig] = old_col
             self._pieces[orig] = 6
-          
 
-        else: #normal
+        else:  # normal
             self._colors[orig] = self._colors[dest]
             self._pieces[orig] = self._pieces[dest]
             self._colors[dest] = -1
             self._pieces[dest] = -1
-        
-        # reset moved states if 
+
+        # reset moved states if
         self.MoveGen.reset_pieces_moved(self.move_nr, self._colors[orig])
 
-
         if (self._pieces[orig] == 1 or move_type & 0b0100 or move_type == 2 or move_type == 3):
-            #assert self.half_moves_50_check == 0
+            # assert self.half_moves_50_check == 0
             self.half_moves_50_check = self.old_moves_50_check
         else:
-            #assert self.half_moves_50_check > 0
-            self.half_moves_50_check -= 1            
-
-            
+            # assert self.half_moves_50_check > 0
+            self.half_moves_50_check -= 1
 
     def calc_attacks(self):
         for i, true_val in enumerate([True, False]):
             move_possible = [False, False]
             self._attack_map = np.zeros(64)
             self.MoveGen.reset_board_states(true_val)
-            # self.pins = [[],[]]
-            # self.checks = []
             for idx in range(self._board_dim**2):
                 piece_color = self._colors[idx]
                 if self._pieces[idx] > 0:
                     legal_moves = self.select_piece(idx)
                     move_possible[piece_color] |= (len(legal_moves) > 0)
-                    #if len(self.capture_moves) > 0:
-                        #np.put(self._attack_map, np.fromiter(self.capture_moves, int, len(self.capture_moves)), 1)
             if i == 1:
                 self.analyse_checkmate(move_possible)
 
@@ -453,10 +427,10 @@ class Model:
         if check_turn and self._colors[orig] != self.player_turn:
             return self.allowed_moves
         if piece > 0:
-            self.capture_moves, self.other_moves  = self.MoveGen.allowed_moves(orig, piece, self._pieces, self._colors, self._last_moves[-1])
-            self.allowed_moves =  self.capture_moves.union(self.other_moves)
+            self.capture_moves, self.other_moves = self.MoveGen.allowed_moves(
+                orig, piece, self._pieces, self._colors, self._last_moves[-1])
+            self.allowed_moves = self.capture_moves.union(self.other_moves)
         return self.allowed_moves
-
 
     def handle_mouse_down(self, mouse_pos):
         self.orig = self.get_piece_from_mouse(mouse_pos)

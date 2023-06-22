@@ -125,7 +125,7 @@ def print_board_string(orig, dest, pieces, colors, board_dim=8):
                 row_str += " " + fen_letter + " "
             if i == orig or i == dest:
                 row_str += bcolors.ENDC
-        row_str += "|" + "   <- " +str(i)
+        row_str += "|" + "   <- " + str(i)
         print(row_str)
-    print("  " +"-"*33)
+    print("  " + "-"*33)
     print("    a   b   c   d   e   f   g   h")
