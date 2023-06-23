@@ -66,7 +66,7 @@ class Model:
         self.promotion_moves = set()
 
         self.piece_counts = {1: [8, 8], 2: [2, 2], 3: [2, 2], 4: [2, 2], 5: [1, 1], 6: [1, 1]}
-        self.nr_allowed_moves = []
+        self.nr_allowed_moves = [0, 0]
 
         if len(fen_init) > 0:
             self.set_fen_string(fen_init)
@@ -75,7 +75,7 @@ class Model:
         if self._view != None:
             self._view.draw(self._pieces, self._colors, self._attack_map)
 
-    def eval_board_shannon(self, nr_legal_moves):
+    def eval_board_shannon(self):
         turn = self.player_turn
         enemy = get_opponent_color(turn)
         score = 0
@@ -458,7 +458,7 @@ class Model:
 
     def generate_legal_moves(self, color=None, silent=False):
         self.calc_attacks(silent=silent)
-        self.nr_allowed_moves = []
+        self.nr_allowed_moves = [0, 0]
         for key in list(self.MoveGen.allowed_moves_piece.keys()).copy():
             # check if move is players turn
             if self.player_turn != self._colors[key] and color != None:

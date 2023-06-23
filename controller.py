@@ -2,7 +2,7 @@ import pygame
 from misc import * 
 from view import Board
 from model import Model
-from search import MiniMax
+from search import TreeSearch
 import numpy as np
 
 class Controller:
@@ -14,7 +14,7 @@ class Controller:
         self.clock = pygame.time.Clock()
         self.GameBoard = Board(square_dim=64)
         self.GameModel = Model(self.GameBoard)
-        self.MiniMaxSearch = MiniMax(self.GameModel)
+        self.TreeSearch = TreeSearch(self.GameModel)
         self.mouse_piece, self.orig = None, None
         self.allowed_moves = set()
         self.user_color = 0 # np.randint(0, 2)
@@ -37,7 +37,7 @@ class Controller:
                         mouse_pos = pygame.mouse.get_pos()
                         self.GameModel.handle_mouse_up(mouse_pos)
                 else: # enemy turn automatic via tree search
-                    best_move = self.MiniMaxSearch.search()
+                    best_move = self.TreeSearch.search(search_type="alphabeta")
                     orig, dest = best_move
                     self.GameModel.move_piece_checked(orig, dest)
                     
